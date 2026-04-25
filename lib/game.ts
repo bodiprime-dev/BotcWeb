@@ -50,7 +50,7 @@ export function applyAction(state: GameState, action: GameAction): GameState {
 
     case "START_GAME": {
       if (state.phase !== "lobby") return state;
-      if (state.players.length < 5) return state;
+      if (state.players.length < 1) return state;
       const script = SCRIPTS[state.scriptId];
       if (!script) return state;
 
