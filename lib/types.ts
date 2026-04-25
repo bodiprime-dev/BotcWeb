@@ -6,6 +6,7 @@ export interface Player {
   role: string | null;   // null en lobby
   alive: boolean;
   isStoryteller: boolean;
+  poisoned: boolean;
 }
 
 export interface GameState {
@@ -17,11 +18,11 @@ export interface GameState {
   storytellerId: string | null;
   createdAt: number;
   startedAt: number | null;
+  selectedRoleIds: string[];   // rôles effectivement en jeu
   nominee: string | null;
-  votes: Record<string, string[]>; // playerId -> [voterIds]
+  votes: Record<string, string[]>;
 }
 
-// Ce que reçoit un joueur (rôle des autres = caché)
 export interface PlayerView {
   code: string;
   scriptId: string;
@@ -36,8 +37,10 @@ export interface PlayerView {
 export type GameAction =
   | { type: "ADD_PLAYER"; name: string }
   | { type: "REMOVE_PLAYER"; playerId: string }
-  | { type: "START_GAME"; storytellerId: string }
+  | { type: "START_GAME"; storytellerId: string; selectedRoleIds: string[] }
   | { type: "TOGGLE_ALIVE"; playerId: string; storytellerId: string }
+  | { type: "TOGGLE_POISON"; playerId: string; storytellerId: string }
+  | { type: "SET_NOMINEE"; playerId: string | null; storytellerId: string }
   | { type: "TOGGLE_PHASE"; storytellerId: string }
   | { type: "NOMINATE"; nominatorId: string; nomineeId: string }
   | { type: "CLEAR_NOMINATION"; storytellerId: string };

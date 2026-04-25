@@ -1,10 +1,15 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Moon, Sun, Eye, EyeOff, Skull, BookOpen, Users, Vote, ArrowLeft, Sparkles, UserPlus, X, Crown } from "lucide-react";
+import {
+  Moon, Sun, Eye, EyeOff, Skull, BookOpen, Users, ArrowLeft,
+  Sparkles, UserPlus, Crown, FlaskConical, Gavel, X, ChevronDown, ChevronUp,
+} from "lucide-react";
 import { SCRIPTS, TEAM_COLORS } from "@/data/scripts";
 import { getPusherClient, channelName } from "@/lib/pusher-client";
 import type { GameState, GameAction } from "@/lib/types";
+
+// ─── Page principale ─────────────────────────────────────────────────────────
 
 export default function GamePage() {
   const params = useParams();
@@ -17,24 +22,18 @@ export default function GamePage() {
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Restaure le playerId depuis localStorage si déjà joint
   useEffect(() => {
     const stored = typeof window !== "undefined" ? localStorage.getItem(`bot:${code}`) : null;
     if (stored) setPlayerId(stored);
   }, [code]);
 
-  // Charge l'état initial + s'abonne au canal Pusher
   useEffect(() => {
     let mounted = true;
-
-    // S'abonne au canal pour recevoir l'état à chaque mise à jour
     const pusher = getPusherClient();
     const channel = pusher.subscribe(channelName(code));
     channel.bind("state-update", (data: { state: GameState }) => {
       if (mounted) setGame(data.state);
     });
-
-    // Fetch initial de l'état brut
     fetch(`/api/game/${code}`)
       .then(res => {
         if (res.status === 404) throw new Error("Partie introuvable");
@@ -42,7 +41,6 @@ export default function GamePage() {
       })
       .then(data => { if (mounted && data.state) setGame(data.state); })
       .catch(e => { if (mounted) setError(e.message); });
-
     return () => {
       mounted = false;
       channel.unbind_all();
@@ -78,8 +76,6 @@ export default function GamePage() {
     });
   }
 
-  // ─── Rendus ────────────────────────────────────────────────────────────
-
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
@@ -97,7 +93,6 @@ export default function GamePage() {
 
   const me = playerId ? game.players.find(p => p.id === playerId) ?? null : null;
 
-  // Pas encore inscrit → écran "rejoindre avec ton nom"
   if (!me) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-6">
@@ -116,7 +111,7 @@ export default function GamePage() {
             className="w-full px-4 py-3 bg-stone-900 ring-1 ring-stone-700 text-stone-100 placeholder:text-stone-600 mb-3 focus:outline-none focus:ring-amber-700/60"
           />
           <button onClick={handleJoin} disabled={joining || !name.trim()} className="w-full p-3 bg-stone-700 hover:bg-stone-600 disabled:bg-stone-800 text-stone-100 ring-1 ring-stone-600 tracking-[0.2em] uppercase text-sm flex items-center justify-center gap-2">
-            <UserPlus className="w-4 h-4" /> {joining ? "..." : "Rejoindre"}
+            <UserPlus className="w-4 h-4" /> {joining ? "…" : "Rejoindre"}
           </button>
           {game.players.length > 0 && (
             <div className="mt-6">
@@ -134,17 +129,106 @@ export default function GamePage() {
   }
 
   if (game.phase === "lobby") return <Lobby game={game} me={me} dispatch={dispatch} onLeave={() => router.push("/")} />;
-
   if (me.isStoryteller) return <StorytellerView game={game} me={me} dispatch={dispatch} onLeave={() => router.push("/")} />;
   return <PlayerView game={game} me={me} dispatch={dispatch} onLeave={() => router.push("/")} />;
 }
 
-// ─── Composants ─────────────────────────────────────────────────────────
+// ─── ScriptReference (panneau partagé) ───────────────────────────────────────
+
+function ScriptReference({ scriptId, onClose }: { scriptId: string; onClose: () => void }) {
+  const script = SCRIPTS[scriptId];
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  const teamOrder: Array<keyof typeof TEAM_COLORS> = ["townsfolk", "outsider", "minion", "demon"];
+  const teamLabels: Record<string, string> = {
+    townsfolk: "Townsfolk", outsider: "Outsiders", minion: "Minions", demon: "Démon",
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-stone-950">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-stone-800">
+        <div className="flex items-center gap-2 text-amber-400 text-sm uppercase tracking-[0.2em]">
+          <BookOpen className="w-4 h-4" /> {script.name} — Tous les rôles
+        </div>
+        <button onClick={onClose} className="p-2 text-stone-400 hover:text-stone-100">
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+      <div className="flex-1 overflow-y-auto px-4 pb-8">
+        {teamOrder.map(team => {
+          const roles = Object.entries(script.roles).filter(([, r]) => r.team === team);
+          if (!roles.length) return null;
+          const tc = TEAM_COLORS[team];
+          return (
+            <div key={team} className="mt-6">
+              <div className={`text-xs uppercase tracking-[0.3em] mb-3 ${tc.text} opacity-80`}>
+                {teamLabels[team]}
+              </div>
+              <div className="space-y-2">
+                {roles.map(([id, role]) => {
+                  const open = expanded === id;
+                  return (
+                    <div
+                      key={id}
+                      className={`ring-1 transition-all cursor-pointer ${open ? `${tc.bg} ${tc.ring}` : "bg-stone-900 ring-stone-800"}`}
+                      onClick={() => setExpanded(open ? null : id)}
+                    >
+                      <div className="flex items-center gap-3 px-4 py-3">
+                        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${tc.accent}`} />
+                        <div className="flex-1">
+                          <span className={`text-sm italic ${open ? tc.text : "text-stone-200"}`}>{role.name}</span>
+                          {!open && (
+                            <p className="text-xs text-stone-500 mt-0.5 leading-relaxed line-clamp-1">{role.ability}</p>
+                          )}
+                        </div>
+                        {open ? <ChevronUp className="w-3 h-3 text-stone-500 flex-shrink-0" /> : <ChevronDown className="w-3 h-3 text-stone-500 flex-shrink-0" />}
+                      </div>
+                      {open && (
+                        <div className="px-4 pb-4 pt-0">
+                          <p className="text-stone-300 text-sm leading-relaxed">{role.ability}</p>
+                          {(role.firstNight || role.otherNight) && (
+                            <div className="mt-2 flex gap-3 text-xs text-stone-500">
+                              {role.firstNight && <span>🌙 1ère nuit : #{role.firstNight}</span>}
+                              {role.otherNight && <span>🌙 Autres nuits : #{role.otherNight}</span>}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Lobby ────────────────────────────────────────────────────────────────────
 
 function Lobby({ game, me, dispatch, onLeave }: any) {
   const script = SCRIPTS[game.scriptId];
-  const isFirstPlayer = game.players[0]?.id === me.id;
-  const canStart = game.players.length >= 5 && isFirstPlayer;
+  const isStoryteller = game.players[0]?.id === me.id;
+  const canStart = game.players.length >= 5 && isStoryteller;
+
+  const [step, setStep] = useState<"players" | "roles">("players");
+  const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
+
+  const needed = game.players.length;
+  const selectedCount = selectedRoleIds.length;
+
+  const toggleRole = (id: string) => {
+    setSelectedRoleIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const teamOrder: Array<keyof typeof TEAM_COLORS> = ["townsfolk", "outsider", "minion", "demon"];
+  const teamLabels: Record<string, string> = {
+    townsfolk: "Townsfolk", outsider: "Outsiders", minion: "Minions", demon: "Démon",
+  };
 
   return (
     <div className="min-h-screen p-6">
@@ -160,6 +244,7 @@ function Lobby({ game, me, dispatch, onLeave }: any) {
           <p className="text-stone-600 text-xs mt-2">Partage ce code avec les autres joueurs</p>
         </div>
 
+        {/* Joueurs */}
         <div className="bg-stone-900 ring-1 ring-stone-700 p-4 mb-6">
           <div className="text-stone-400 text-xs tracking-[0.2em] uppercase mb-3 flex items-center gap-2">
             <Users className="w-3 h-3" /> Joueurs ({game.players.length})
@@ -176,41 +261,146 @@ function Lobby({ game, me, dispatch, onLeave }: any) {
           <p className="text-stone-600 text-xs mt-3 italic">Le 1er joueur (👑) sera le Conteur. Min. 5 joueurs.</p>
         </div>
 
-        {isFirstPlayer && (
-          <button
-            onClick={() => dispatch({ type: "START_GAME", storytellerId: me.id })}
-            disabled={!canStart}
-            className="w-full p-4 bg-red-900 hover:bg-red-800 disabled:bg-stone-800 disabled:text-stone-600 text-stone-100 ring-1 ring-red-700/50 disabled:ring-stone-700 tracking-[0.2em] uppercase text-sm transition-all"
-          >
-            Lancer la partie
-          </button>
+        {/* Sélection des rôles — uniquement pour le Conteur */}
+        {isStoryteller && canStart && (
+          <>
+            {step === "players" && (
+              <button
+                onClick={() => setStep("roles")}
+                className="w-full p-4 bg-stone-800 hover:bg-stone-700 text-stone-100 ring-1 ring-stone-600 tracking-[0.2em] uppercase text-sm mb-3 flex items-center justify-center gap-2"
+              >
+                <BookOpen className="w-4 h-4" /> Configurer les rôles
+              </button>
+            )}
+
+            {step === "roles" && (
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="text-stone-400 text-xs tracking-[0.2em] uppercase flex items-center gap-2">
+                    <BookOpen className="w-3 h-3" /> Choix des rôles
+                  </div>
+                  <div className={`text-sm font-medium ${selectedCount === needed ? "text-amber-400" : selectedCount > needed ? "text-red-400" : "text-stone-400"}`}>
+                    {selectedCount}/{needed} rôles
+                  </div>
+                </div>
+
+                {teamOrder.map(team => {
+                  const roles = Object.entries(script.roles).filter(([, r]) => r.team === team);
+                  if (!roles.length) return null;
+                  const tc = TEAM_COLORS[team];
+                  return (
+                    <div key={team} className="mb-4">
+                      <div className={`text-xs uppercase tracking-[0.3em] mb-2 ${tc.text} opacity-70`}>
+                        {teamLabels[team]}
+                      </div>
+                      <div className="space-y-1">
+                        {roles.map(([id, role]) => {
+                          const checked = selectedRoleIds.includes(id);
+                          return (
+                            <button
+                              key={id}
+                              onClick={() => toggleRole(id)}
+                              className={`w-full flex items-center gap-3 px-3 py-2.5 ring-1 transition-all text-left ${
+                                checked
+                                  ? `${tc.bg} ${tc.ring} ${tc.text}`
+                                  : "bg-stone-900 ring-stone-800 text-stone-400 hover:ring-stone-600"
+                              }`}
+                            >
+                              {/* Checkbox */}
+                              <div className={`w-4 h-4 flex-shrink-0 border flex items-center justify-center text-[10px] font-bold transition-all ${
+                                checked ? `${tc.accent} border-transparent text-stone-100` : "border-stone-600 bg-transparent"
+                              }`}>
+                                {checked && "✓"}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className={`text-sm italic ${checked ? tc.text : "text-stone-300"}`}>{role.name}</div>
+                                <div className="text-xs text-stone-500 leading-tight mt-0.5 line-clamp-1">{role.ability}</div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                <div className="flex gap-2 mt-2">
+                  <button onClick={() => { setStep("players"); setSelectedRoleIds([]); }} className="flex-1 p-3 bg-stone-900 ring-1 ring-stone-700 text-stone-400 text-sm">
+                    ← Annuler
+                  </button>
+                  <button
+                    onClick={() => dispatch({ type: "START_GAME", storytellerId: me.id, selectedRoleIds })}
+                    disabled={selectedCount !== needed}
+                    className="flex-2 flex-grow-[2] p-3 bg-red-900 hover:bg-red-800 disabled:bg-stone-800 disabled:text-stone-600 text-stone-100 ring-1 ring-red-700/50 disabled:ring-stone-700 tracking-[0.2em] uppercase text-sm transition-all"
+                  >
+                    {selectedCount === needed ? "Lancer la partie" : `${needed - selectedCount} rôle(s) manquant(s)`}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {step === "players" && (
+              <button
+                onClick={() => dispatch({ type: "START_GAME", storytellerId: me.id, selectedRoleIds: [] })}
+                className="w-full p-4 bg-red-900/60 hover:bg-red-900 text-stone-300 hover:text-stone-100 ring-1 ring-red-900/50 tracking-[0.2em] uppercase text-xs transition-all"
+              >
+                Lancer avec rôles aléatoires
+              </button>
+            )}
+          </>
         )}
-        {!isFirstPlayer && (
+
+        {!isStoryteller && (
           <div className="text-center text-stone-500 text-sm italic">En attente du Conteur…</div>
+        )}
+        {isStoryteller && !canStart && (
+          <div className="text-center text-stone-500 text-sm italic">En attente de joueurs (min. 5)…</div>
         )}
       </div>
     </div>
   );
 }
 
+// ─── Vue Conteur ──────────────────────────────────────────────────────────────
+
 function StorytellerView({ game, me, dispatch, onLeave }: any) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showScript, setShowScript] = useState(false);
   const script = SCRIPTS[game.scriptId];
   const ROLES = script.roles;
   const selected = game.players.find((p: any) => p.id === selectedId);
+
+  // Ordre de résolution nocturne pour les vivants
+  const isFirstNight = game.day === 1;
+  const nightOrder = Object.entries(ROLES)
+    .map(([id, role]: [string, any]) => {
+      const order = isFirstNight ? role.firstNight : role.otherNight;
+      if (order == null) return null;
+      const player = game.players.find((p: any) => p.role === id && p.alive);
+      if (!player) return null;
+      return { id, role, order, player };
+    })
+    .filter(Boolean)
+    .sort((a: any, b: any) => a.order - b.order) as any[];
 
   const radius = Math.min(180, 60 + game.players.length * 12);
   const center = radius + 60;
   const size = center * 2;
 
   return (
-    <div className="min-h-screen p-6">
-      <div className="flex items-center justify-between mb-6 max-w-6xl mx-auto">
+    <div className="min-h-screen p-4 pb-8">
+      {showScript && <ScriptReference scriptId={game.scriptId} onClose={() => setShowScript(false)} />}
+
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4 max-w-6xl mx-auto">
         <button onClick={onLeave} className="flex items-center gap-2 text-stone-400 hover:text-stone-200">
           <ArrowLeft className="w-4 h-4" /> <span className="text-sm">Quitter</span>
         </button>
         <div className="text-stone-500 text-xs tracking-[0.2em] uppercase hidden sm:block">{script.name} · {game.code}</div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowScript(true)} className="flex items-center gap-1.5 px-3 py-1.5 ring-1 ring-stone-700 bg-stone-900 hover:bg-stone-800 text-stone-400 hover:text-stone-200 text-xs uppercase tracking-wider">
+            <BookOpen className="w-3 h-3" /> Rôles
+          </button>
           <div className="text-stone-400 text-xs tracking-[0.2em] uppercase">Jour {game.day}</div>
           <button onClick={() => dispatch({ type: "TOGGLE_PHASE", storytellerId: me.id })} className={`flex items-center gap-2 px-4 py-2 ring-1 ${game.phase === "day" ? "bg-amber-900/30 ring-amber-700/50 text-amber-100" : "bg-indigo-950 ring-indigo-800 text-indigo-100"}`}>
             {game.phase === "day" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
@@ -219,7 +409,8 @@ function StorytellerView({ game, me, dispatch, onLeave }: any) {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto grid lg:grid-cols-[1fr_320px] gap-8">
+      <div className="max-w-6xl mx-auto grid lg:grid-cols-[1fr_320px] gap-6">
+        {/* Grimoire circulaire */}
         <div className="relative">
           <div className="text-center mb-2">
             <div className="inline-flex items-center gap-2 text-stone-400 text-xs tracking-[0.3em] uppercase">
@@ -238,11 +429,27 @@ function StorytellerView({ game, me, dispatch, onLeave }: any) {
               const y = center + radius * Math.sin(angle) - 36;
               const role = ROLES[p.role!];
               const team = TEAM_COLORS[role.team];
+              const isNominee = game.nominee === p.id;
               return (
-                <button key={p.id} onClick={() => setSelectedId(p.id)} className="absolute" style={{ left: x, top: y }}>
-                  <div className={`w-[72px] h-[72px] rounded-full ${team.bg} ring-2 ${team.ring} flex flex-col items-center justify-center transition-all relative ${selectedId === p.id ? "scale-110 ring-amber-400" : ""} ${!p.alive ? "opacity-40 grayscale" : ""}`}>
+                <button key={p.id} onClick={() => setSelectedId(p.id === selectedId ? null : p.id)} className="absolute" style={{ left: x, top: y }}>
+                  <div className={`w-[72px] h-[72px] rounded-full ${team.bg} ring-2 flex flex-col items-center justify-center transition-all relative ${
+                    selectedId === p.id ? "scale-110 ring-amber-400" :
+                    isNominee ? "ring-orange-400" :
+                    team.ring
+                  } ${!p.alive ? "opacity-40 grayscale" : ""}`}>
                     <div className={`text-[10px] font-bold ${team.text} px-1 text-center leading-tight`}>{role.name}</div>
                     {!p.alive && <Skull className="w-4 h-4 text-stone-700 absolute" />}
+                    {/* Badges statut */}
+                    {p.poisoned && p.alive && (
+                      <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-purple-800 ring-1 ring-purple-600 flex items-center justify-center">
+                        <FlaskConical className="w-2.5 h-2.5 text-purple-200" />
+                      </div>
+                    )}
+                    {isNominee && p.alive && (
+                      <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-orange-800 ring-1 ring-orange-600 flex items-center justify-center">
+                        <Gavel className="w-2.5 h-2.5 text-orange-200" />
+                      </div>
+                    )}
                   </div>
                   <div className="text-center mt-1 text-stone-200 text-xs">{p.name}</div>
                 </button>
@@ -251,39 +458,121 @@ function StorytellerView({ game, me, dispatch, onLeave }: any) {
           </div>
         </div>
 
-        <aside className="space-y-4">
+        {/* Panneau latéral */}
+        <aside className="space-y-3">
+          {/* Joueur sélectionné */}
           {selected ? (
-            <div className="bg-stone-100 text-stone-900 p-5 ring-1 ring-stone-400">
+            <div className="bg-stone-100 text-stone-900 p-4 ring-1 ring-stone-400">
               <div className="flex items-start justify-between mb-3">
                 <div>
                   <div className="text-xs uppercase text-stone-600">Joueur</div>
                   <div className="text-2xl">{selected.name}</div>
                 </div>
-                <button onClick={() => dispatch({ type: "TOGGLE_ALIVE", playerId: selected.id, storytellerId: me.id })} className="p-2 hover:bg-stone-300/60">
-                  {selected.alive ? <Sparkles className="w-5 h-5 text-amber-700" /> : <Skull className="w-5 h-5 text-stone-700" />}
+                <button onClick={() => setSelectedId(null)} className="text-stone-400 hover:text-stone-600 p-1">
+                  <X className="w-4 h-4" />
                 </button>
               </div>
-              <div className="border-t border-stone-300 pt-3">
-                <div className="flex items-center gap-2 mb-2">
+              <div className="border-t border-stone-300 pt-3 mb-3">
+                <div className="flex items-center gap-2 mb-1">
                   <span className={`w-2 h-2 rounded-full ${TEAM_COLORS[ROLES[selected.role!].team].accent}`} />
                   <span className="text-xs uppercase text-stone-700">{TEAM_COLORS[ROLES[selected.role!].team].label}</span>
                 </div>
-                <div className="text-xl mb-2 italic">{ROLES[selected.role!].name}</div>
-                <p className="text-sm leading-relaxed">{ROLES[selected.role!].ability}</p>
+                <div className="text-lg italic mb-1">{ROLES[selected.role!].name}</div>
+                <p className="text-xs text-stone-600 leading-relaxed">{ROLES[selected.role!].ability}</p>
+              </div>
+              {/* Actions */}
+              <div className="grid grid-cols-3 gap-2">
+                {/* Mort / Vivant */}
+                <button
+                  onClick={() => dispatch({ type: "TOGGLE_ALIVE", playerId: selected.id, storytellerId: me.id })}
+                  className={`flex flex-col items-center gap-1 p-2 ring-1 text-xs uppercase tracking-wide transition-all ${
+                    !selected.alive
+                      ? "bg-stone-800 ring-stone-600 text-stone-300"
+                      : "bg-stone-200 ring-stone-300 text-stone-700 hover:bg-stone-300"
+                  }`}
+                >
+                  {selected.alive ? <Sparkles className="w-4 h-4 text-amber-700" /> : <Skull className="w-4 h-4 text-stone-500" />}
+                  {selected.alive ? "Tuer" : "Vivant"}
+                </button>
+                {/* Poison */}
+                <button
+                  onClick={() => selected.alive && dispatch({ type: "TOGGLE_POISON", playerId: selected.id, storytellerId: me.id })}
+                  disabled={!selected.alive}
+                  className={`flex flex-col items-center gap-1 p-2 ring-1 text-xs uppercase tracking-wide transition-all disabled:opacity-40 ${
+                    selected.poisoned
+                      ? "bg-purple-900 ring-purple-700 text-purple-200"
+                      : "bg-stone-200 ring-stone-300 text-stone-700 hover:bg-purple-100"
+                  }`}
+                >
+                  <FlaskConical className="w-4 h-4" />
+                  {selected.poisoned ? "Empoisonné" : "Empoisonner"}
+                </button>
+                {/* Nomination */}
+                <button
+                  onClick={() => selected.alive && dispatch({
+                    type: "SET_NOMINEE",
+                    playerId: game.nominee === selected.id ? null : selected.id,
+                    storytellerId: me.id,
+                  })}
+                  disabled={!selected.alive}
+                  className={`flex flex-col items-center gap-1 p-2 ring-1 text-xs uppercase tracking-wide transition-all disabled:opacity-40 ${
+                    game.nominee === selected.id
+                      ? "bg-orange-900 ring-orange-700 text-orange-200"
+                      : "bg-stone-200 ring-stone-300 text-stone-700 hover:bg-orange-100"
+                  }`}
+                >
+                  <Gavel className="w-4 h-4" />
+                  {game.nominee === selected.id ? "Nominé" : "Nominer"}
+                </button>
               </div>
             </div>
           ) : (
-            <div className="bg-stone-100 text-stone-900 p-5 ring-1 ring-stone-400 text-center">
-              <BookOpen className="w-8 h-8 mx-auto mb-2 text-stone-600" />
-              <p className="text-sm italic">Touche un joueur pour voir son rôle</p>
+            <div className="bg-stone-100 text-stone-900 p-4 ring-1 ring-stone-400 text-center">
+              <BookOpen className="w-7 h-7 mx-auto mb-2 text-stone-600" />
+              <p className="text-sm italic text-stone-600">Touche un joueur pour le gérer</p>
             </div>
           )}
 
+          {/* Nomination active */}
           {game.nominee && (
-            <div className="bg-red-950/50 ring-1 ring-red-800 p-4">
-              <div className="text-red-300 text-xs uppercase mb-1">Nomination en cours</div>
-              <div className="text-stone-100">{game.players.find((p: any) => p.id === game.nominee)?.name}</div>
-              <button onClick={() => dispatch({ type: "CLEAR_NOMINATION", storytellerId: me.id })} className="text-red-300 text-xs underline mt-2">Annuler</button>
+            <div className="bg-orange-950/50 ring-1 ring-orange-800 p-3">
+              <div className="text-orange-300 text-xs uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                <Gavel className="w-3 h-3" /> Nomination en cours
+              </div>
+              <div className="text-stone-100 font-medium">{game.players.find((p: any) => p.id === game.nominee)?.name}</div>
+              <button onClick={() => dispatch({ type: "CLEAR_NOMINATION", storytellerId: me.id })} className="text-orange-400 text-xs underline mt-1">Annuler</button>
+            </div>
+          )}
+
+          {/* Ordre de résolution nocturne */}
+          {game.phase === "night" && (
+            <div className="bg-indigo-950/60 ring-1 ring-indigo-900 p-4">
+              <div className="text-indigo-300 text-xs uppercase tracking-[0.2em] mb-3 flex items-center gap-2">
+                <Moon className="w-3 h-3" /> Ordre de la nuit {game.day}
+              </div>
+              {nightOrder.length === 0 ? (
+                <p className="text-stone-500 text-xs italic">Aucune action cette nuit.</p>
+              ) : (
+                <ol className="space-y-2">
+                  {nightOrder.map(({ id, role, player }: any, i: number) => {
+                    const tc = TEAM_COLORS[role.team];
+                    return (
+                      <li key={id} className="flex items-center gap-2">
+                        <span className={`w-5 h-5 rounded-full ${tc.accent} text-stone-50 text-[10px] font-bold flex items-center justify-center flex-shrink-0`}>
+                          {i + 1}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <div className={`text-xs font-medium ${tc.text}`}>{role.name}</div>
+                          <div className="text-stone-400 text-xs">{player.name}</div>
+                        </div>
+                        {player.poisoned && (
+                          <FlaskConical className="w-3 h-3 text-purple-400 flex-shrink-0" />
+                        )}
+                      </li>
+                    );
+                  })}
+                </ol>
+              )}
             </div>
           )}
         </aside>
@@ -292,16 +581,21 @@ function StorytellerView({ game, me, dispatch, onLeave }: any) {
   );
 }
 
+// ─── Vue Joueur ───────────────────────────────────────────────────────────────
+
 function PlayerView({ game, me, dispatch, onLeave }: any) {
   const script = SCRIPTS[game.scriptId];
   const ROLES = script.roles;
   const others = game.players.filter((p: any) => p.id !== me.id);
   const [revealed, setRevealed] = useState(false);
+  const [showScript, setShowScript] = useState(false);
   const myRole = ROLES[me.role!];
   const team = TEAM_COLORS[myRole.team];
 
   return (
     <div className="min-h-screen p-6">
+      {showScript && <ScriptReference scriptId={game.scriptId} onClose={() => setShowScript(false)} />}
+
       <div className="flex items-center justify-between mb-6 max-w-3xl mx-auto">
         <button onClick={onLeave} className="flex items-center gap-2 text-stone-400 hover:text-stone-200">
           <ArrowLeft className="w-4 h-4" /> <span className="text-sm">Quitter</span>
@@ -314,7 +608,8 @@ function PlayerView({ game, me, dispatch, onLeave }: any) {
       </div>
 
       <div className="max-w-3xl mx-auto">
-        <div className="bg-stone-100 text-stone-900 p-8 ring-1 ring-stone-400 mb-8">
+        {/* Carte de rôle */}
+        <div className="bg-stone-100 text-stone-900 p-8 ring-1 ring-stone-400 mb-4">
           <div className="text-center">
             <div className="text-xs uppercase text-stone-600 mb-1">Bonjour {me.name}, ton rôle est</div>
             {revealed ? (
@@ -325,8 +620,28 @@ function PlayerView({ game, me, dispatch, onLeave }: any) {
                   </div>
                 </div>
                 <h2 className="text-5xl mb-4 italic">{myRole.name}</h2>
-                <p className="max-w-md mx-auto text-stone-800 leading-relaxed">{myRole.ability}</p>
-                <button onClick={() => setRevealed(false)} className="mt-6 text-xs uppercase text-stone-600 hover:text-stone-900 inline-flex items-center gap-2">
+
+                {/* Ability / Règles */}
+                <div className="text-left max-w-md mx-auto bg-stone-200/60 ring-1 ring-stone-300 p-4 mb-4">
+                  <div className="text-xs uppercase text-stone-500 tracking-wider mb-2">Capacité</div>
+                  <p className="text-stone-800 leading-relaxed text-sm">{myRole.ability}</p>
+                </div>
+
+                {/* Ordre nocturne si applicable */}
+                {(myRole.firstNight || myRole.otherNight) && (
+                  <div className="max-w-md mx-auto text-xs text-stone-500 flex gap-4 justify-center mb-4">
+                    {myRole.firstNight && <span>🌙 1ère nuit : #{myRole.firstNight}</span>}
+                    {myRole.otherNight && <span>🌙 Autres nuits : #{myRole.otherNight}</span>}
+                  </div>
+                )}
+
+                {me.poisoned && (
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-purple-900/40 ring-1 ring-purple-700/50 text-purple-300 text-xs mb-4">
+                    <FlaskConical className="w-3 h-3" /> Tu es empoisonné(e) — tes infos peuvent être fausses
+                  </div>
+                )}
+
+                <button onClick={() => setRevealed(false)} className="text-xs uppercase text-stone-600 hover:text-stone-900 inline-flex items-center gap-2">
                   <EyeOff className="w-3 h-3" /> Cacher
                 </button>
               </>
@@ -341,6 +656,15 @@ function PlayerView({ game, me, dispatch, onLeave }: any) {
           </div>
         </div>
 
+        {/* Bouton voir tous les rôles */}
+        <button
+          onClick={() => setShowScript(true)}
+          className="w-full flex items-center justify-center gap-2 p-3 mb-6 bg-stone-900 ring-1 ring-stone-700 text-stone-400 hover:text-stone-200 hover:ring-stone-500 text-xs uppercase tracking-[0.2em] transition-all"
+        >
+          <BookOpen className="w-3 h-3" /> Voir tous les rôles du script
+        </button>
+
+        {/* Village */}
         <div className="mb-6">
           <h3 className="text-stone-400 text-xs uppercase tracking-[0.3em] mb-3 flex items-center gap-2">
             <Users className="w-3 h-3" /> La place du village
@@ -351,7 +675,7 @@ function PlayerView({ game, me, dispatch, onLeave }: any) {
                 key={p.id}
                 onClick={() => game.phase === "day" && p.alive && dispatch({ type: "NOMINATE", nominatorId: me.id, nomineeId: p.id })}
                 disabled={!p.alive || game.phase !== "day"}
-                className={`p-3 ring-1 transition-all ${p.alive ? "bg-stone-900 ring-stone-700 hover:ring-stone-500" : "bg-stone-950 ring-stone-800 opacity-40"} ${game.nominee === p.id ? "ring-red-500 bg-red-950/40" : ""}`}
+                className={`p-3 ring-1 transition-all ${p.alive ? "bg-stone-900 ring-stone-700 hover:ring-stone-500" : "bg-stone-950 ring-stone-800 opacity-40"} ${game.nominee === p.id ? "ring-orange-500 bg-orange-950/40" : ""}`}
               >
                 <div className="aspect-square rounded-full bg-stone-800 ring-1 ring-stone-700 flex items-center justify-center mb-2 mx-auto" style={{ width: 48, height: 48 }}>
                   {p.alive ? <span className="text-stone-300 text-lg">{p.name[0]}</span> : <Skull className="w-5 h-5 text-stone-600" />}
@@ -363,10 +687,10 @@ function PlayerView({ game, me, dispatch, onLeave }: any) {
         </div>
 
         {game.nominee && (
-          <div className="bg-red-950/40 ring-1 ring-red-800 p-4 text-center">
-            <Vote className="w-4 h-4 inline mr-2 text-red-300" />
+          <div className="bg-orange-950/40 ring-1 ring-orange-800 p-4 text-center">
+            <Gavel className="w-4 h-4 inline mr-2 text-orange-300" />
             <span className="text-stone-200 text-sm">
-              Nomination : <span className="text-red-300 font-bold">{game.players.find((p: any) => p.id === game.nominee)?.name}</span>
+              Nomination : <span className="text-orange-300 font-bold">{game.players.find((p: any) => p.id === game.nominee)?.name}</span>
             </span>
           </div>
         )}

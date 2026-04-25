@@ -13,13 +13,13 @@ export function createNewGame(scriptId: string): GameState {
     storytellerId: null,
     createdAt: Date.now(),
     startedAt: null,
+    selectedRoleIds: [],
     nominee: null,
     votes: {},
   };
 }
 
 export function generateCode(): string {
-  // 4 lettres lisibles, sans ambiguïtés
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ";
   let s = "";
   for (let i = 0; i < 4; i++) s += alphabet[Math.floor(Math.random() * alphabet.length)];
@@ -39,6 +39,7 @@ export function applyAction(state: GameState, action: GameAction): GameState {
         role: null,
         alive: true,
         isStoryteller: false,
+        poisoned: false,
       };
       return { ...state, players: [...state.players, player] };
     }
@@ -50,17 +51,25 @@ export function applyAction(state: GameState, action: GameAction): GameState {
 
     case "START_GAME": {
       if (state.phase !== "lobby") return state;
-      if (state.players.length < 1) return state;
+      if (state.players.length < 5) return state;
       const script = SCRIPTS[state.scriptId];
       if (!script) return state;
 
-      const roleKeys = Object.keys(script.roles);
-      const shuffledRoles = [...roleKeys].sort(() => Math.random() - 0.5).slice(0, state.players.length);
+      // Utilise les rôles sélectionnés si assez ; sinon tire au sort parmi tout le script
+      const pool = action.selectedRoleIds.length >= state.players.length
+        ? action.selectedRoleIds
+        : Object.keys(script.roles);
+
+      const assignedRoles = [...pool]
+        .sort(() => Math.random() - 0.5)
+        .slice(0, state.players.length);
+
       const players = state.players.map((p, i) => ({
         ...p,
-        role: shuffledRoles[i],
+        role: assignedRoles[i],
         isStoryteller: p.id === action.storytellerId,
       }));
+
       return {
         ...state,
         players,
@@ -68,6 +77,7 @@ export function applyAction(state: GameState, action: GameAction): GameState {
         day: 1,
         startedAt: Date.now(),
         storytellerId: action.storytellerId,
+        selectedRoleIds: assignedRoles,
       };
     }
 
@@ -75,8 +85,31 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       if (action.storytellerId !== state.storytellerId) return state;
       return {
         ...state,
-        players: state.players.map(p => p.id === action.playerId ? { ...p, alive: !p.alive } : p),
+        players: state.players.map(p =>
+          p.id === action.playerId
+            ? { ...p, alive: !p.alive, poisoned: p.alive ? false : p.poisoned }
+            : p
+        ),
+        // Retire la nomination si ce joueur était nominé
+        nominee: state.nominee === action.playerId
+          ? null
+          : state.nominee,
       };
+    }
+
+    case "TOGGLE_POISON": {
+      if (action.storytellerId !== state.storytellerId) return state;
+      return {
+        ...state,
+        players: state.players.map(p =>
+          p.id === action.playerId ? { ...p, poisoned: !p.poisoned } : p
+        ),
+      };
+    }
+
+    case "SET_NOMINEE": {
+      if (action.storytellerId !== state.storytellerId) return state;
+      return { ...state, nominee: action.playerId, votes: {} };
     }
 
     case "TOGGLE_PHASE": {
@@ -108,7 +141,6 @@ export function applyAction(state: GameState, action: GameAction): GameState {
 export function getPlayerView(state: GameState, playerId: string): PlayerView | null {
   const me = state.players.find(p => p.id === playerId);
   if (!me) return null;
-  // Le Conteur voit tout
   const others = state.players
     .filter(p => p.id !== playerId)
     .map(p => ({
