@@ -478,19 +478,21 @@ function SimStorytellerView({ game, me, dispatch }: any) {
   // Ouverture auto en phase nuit (utile pour voir l'ordre nocturne)
   useEffect(() => { if (game.phase === "night") setPanelOpen(true); }, [game.phase]);
 
-  // Rayon adaptatif : plus grand quand le drawer est fermé
-  const baseExtent = 75 + playable.length * 16;
-  const radius = Math.min(panelOpen ? 210 : 300, baseExtent);
+  // Rayon adaptatif : croissance basée sur le nombre de joueurs, plafond
+  // qui dépend de l'état du drawer (drawer fermé → plus de place dispo).
+  const radius = panelOpen
+    ? Math.min(280, 110 + playable.length * 22)
+    : Math.min(400, 140 + playable.length * 28);
   const center = radius + 60;
   const size = center * 2;
 
   const closePanel = () => { setSelectedId(null); setPanelOpen(false); };
 
   return (
-    <div className="min-h-[100dvh] px-2 sm:px-4 pb-6 pt-3">
+    <div className="min-h-[100dvh] px-2 sm:px-4 pb-6 pt-3 flex flex-col">
       {showScript && <ScriptReference scriptId={game.scriptId} onClose={() => setShowScript(false)} />}
 
-      <div className="flex items-center justify-between mb-4 max-w-7xl mx-auto gap-2">
+      <div className="flex items-center justify-between mb-4 max-w-7xl w-full mx-auto gap-2">
         <div className="text-stone-500 text-xs tracking-[0.2em] uppercase hidden md:block">
           Conteur · {game.code}
         </div>
@@ -519,56 +521,62 @@ function SimStorytellerView({ game, me, dispatch }: any) {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto">
-        <div className="relative">
-          <div className="text-center mb-2">
-            <div className="inline-flex items-center gap-2 text-stone-400 text-xs tracking-[0.3em] uppercase">
-              <BookOpen className="w-3 h-3" /> Grimoire
-            </div>
-          </div>
-          <div className="relative mx-auto" style={{ width: size, height: size, maxWidth: "100%" }}>
-            <div className="absolute inset-12 rounded-full ring-1 ring-stone-700/40" />
-            <div className="absolute inset-20 rounded-full ring-1 ring-stone-800/40" />
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <Skull className="w-10 h-10 text-stone-700" strokeWidth={1.2} />
-            </div>
-            {playable.map((p: any, i: number) => {
-              const angle = (i / playable.length) * 2 * Math.PI - Math.PI / 2;
-              const x = center + radius * Math.cos(angle) - 36;
-              const y = center + radius * Math.sin(angle) - 36;
-              const role = ROLES[p.role!];
-              const team = TEAM_COLORS[role.team as Team];
-              const isNominee = game.nominee === p.id;
-              const isDrunk = p.role === "drunk";
-              return (
-                <button key={p.id} onClick={() => setSelectedId(p.id === selectedId ? null : p.id)}
-                  className="absolute" style={{ left: x, top: y }}>
-                  <div className={`w-[72px] h-[72px] rounded-full ${team.bg} ring-2 flex flex-col items-center justify-center transition-all relative ${
-                    selectedId === p.id ? "scale-110 ring-amber-400" : isNominee ? "ring-orange-400" : team.ring
-                  } ${!p.alive ? "opacity-40 grayscale" : ""}`}>
-                    <div className={`text-[10px] font-bold ${team.text} px-1 text-center leading-tight`}>
-                      {role.name}{isDrunk ? " 🍺" : ""}
-                    </div>
-                    {!p.alive && <Skull className="w-4 h-4 text-stone-700 absolute" />}
-                    {p.poisoned && p.alive && (
-                      <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-purple-800 ring-1 ring-purple-600 flex items-center justify-center">
-                        <FlaskConical className="w-2.5 h-2.5 text-purple-200" />
-                      </div>
-                    )}
-                    {isNominee && p.alive && (
-                      <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-orange-800 ring-1 ring-orange-600 flex items-center justify-center">
-                        <Gavel className="w-2.5 h-2.5 text-orange-200" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="text-center mt-1 text-stone-200 text-xs">{p.name}</div>
-                </button>
-              );
-            })}
+      <div className="max-w-7xl w-full mx-auto flex-1 flex flex-col items-center justify-center">
+        <div className="text-center mb-3">
+          <div className="inline-flex items-center gap-2 text-stone-400 text-xs tracking-[0.3em] uppercase">
+            <BookOpen className="w-3 h-3" /> Grimoire
           </div>
         </div>
-
+        <div className="relative" style={{ width: size, height: size, maxWidth: "100%" }}>
+          <div className="absolute inset-12 rounded-full ring-1 ring-stone-700/40" />
+          <div className="absolute inset-20 rounded-full ring-1 ring-stone-800/40" />
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <Skull className="w-10 h-10 text-stone-700" strokeWidth={1.2} />
+          </div>
+          {playable.map((p: any, i: number) => {
+            const angle = (i / playable.length) * 2 * Math.PI - Math.PI / 2;
+            const x = center + radius * Math.cos(angle) - 36;
+            const y = center + radius * Math.sin(angle) - 36;
+            const role = ROLES[p.role!];
+            const team = TEAM_COLORS[role.team as Team];
+            const isNominee = game.nominee === p.id;
+            const isDrunk = p.role === "drunk";
+            return (
+              <button key={p.id} onClick={() => setSelectedId(p.id === selectedId ? null : p.id)}
+                className="absolute" style={{ left: x, top: y }}>
+                <div className={`w-[72px] h-[72px] rounded-full ${team.bg} ring-2 flex flex-col items-center justify-center transition-all relative ${
+                  selectedId === p.id ? "scale-110 ring-amber-400" : isNominee ? "ring-orange-400" : team.ring
+                } ${!p.alive ? "opacity-40 grayscale" : ""}`}>
+                  <div className={`text-[10px] font-bold ${team.text} px-1 text-center leading-tight`}>
+                    {role.name}{isDrunk ? " 🍺" : ""}
+                  </div>
+                  {!p.alive && <Skull className="w-4 h-4 text-stone-700 absolute" />}
+                  {p.poisoned && p.alive && (
+                    <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-purple-800 ring-1 ring-purple-600 flex items-center justify-center">
+                      <FlaskConical className="w-2.5 h-2.5 text-purple-200" />
+                    </div>
+                  )}
+                  {isNominee && p.alive && (
+                    <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-orange-800 ring-1 ring-orange-600 flex items-center justify-center">
+                      <Gavel className="w-2.5 h-2.5 text-orange-200" />
+                    </div>
+                  )}
+                </div>
+                <div className="text-center mt-1 text-stone-200 text-xs">{p.name}</div>
+              </button>
+            );
+          })}
+        </div>
       </div>
+
+      {/* ─── Backdrop : tape à côté du drawer pour le fermer ─── */}
+      {panelOpen && (
+        <div
+          onClick={closePanel}
+          className="fixed inset-0 z-20 bg-black/40 backdrop-blur-[2px] transition-opacity"
+          aria-hidden
+        />
+      )}
 
       {/* ─── Drawer rétractable ─── */}
       <aside
@@ -577,10 +585,17 @@ function SimStorytellerView({ game, me, dispatch }: any) {
           panelOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-stone-800 sticky top-0 bg-stone-950/95 backdrop-blur-md">
+        <div
+          className="flex items-center justify-between px-4 py-3 border-b border-stone-800 sticky top-0 bg-stone-950/95 backdrop-blur-md z-10"
+          style={{ paddingTop: "max(env(safe-area-inset-top), 0.75rem)" }}
+        >
           <div className="text-stone-400 text-xs uppercase tracking-[0.2em]">Panneau</div>
-          <button onClick={closePanel} className="text-stone-400 hover:text-stone-100 p-1">
-            <X className="w-4 h-4" />
+          <button
+            onClick={closePanel}
+            aria-label="Fermer le panneau"
+            className="text-stone-300 hover:text-stone-100 p-2 -mr-1 ring-1 ring-stone-700 hover:ring-stone-500 transition-colors"
+          >
+            <X className="w-5 h-5" />
           </button>
         </div>
 

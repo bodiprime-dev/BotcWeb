@@ -466,9 +466,12 @@ function StorytellerView({ game, me, dispatch, onLeave }: any) {
     if (game.phase === "night") setPanelOpen(true);
   }, [game.phase]);
 
-  // Rayon du cercle adaptatif : plus grand quand le drawer est fermé
-  const baseExtent = 80 + playablePlayers.length * 16;
-  const radius = Math.min(panelOpen ? 220 : 320, baseExtent);
+  // Rayon du cercle adaptatif. Formule : un palier de base qui dépend du
+  // nombre de joueurs, plafonné par un max qui dépend de l'état du drawer.
+  // Drawer fermé → on peut viser plus large car toute la largeur est dispo.
+  const radius = panelOpen
+    ? Math.min(280, 110 + playablePlayers.length * 22)
+    : Math.min(400, 140 + playablePlayers.length * 28);
   const center = radius + 60;
   const size = center * 2;
 
@@ -478,11 +481,11 @@ function StorytellerView({ game, me, dispatch, onLeave }: any) {
   };
 
   return (
-    <div className="min-h-[100dvh] px-2 sm:px-4 pb-6 pt-3">
+    <div className="min-h-[100dvh] px-2 sm:px-4 pb-6 pt-3 flex flex-col">
       {showScript && <ScriptReference scriptId={game.scriptId} onClose={() => setShowScript(false)} />}
 
       {/* ─── Header ─── */}
-      <div className="flex items-center justify-between mb-4 max-w-7xl mx-auto gap-2">
+      <div className="flex items-center justify-between mb-4 max-w-7xl w-full mx-auto gap-2">
         <button onClick={onLeave} className="flex items-center gap-2 text-stone-400 hover:text-stone-200">
           <ArrowLeft className="w-4 h-4" /> <span className="text-sm hidden sm:inline">Quitter</span>
         </button>
@@ -518,14 +521,14 @@ function StorytellerView({ game, me, dispatch, onLeave }: any) {
         </div>
       </div>
 
-      {/* ─── Grimoire pleine largeur ─── */}
-      <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-2">
+      {/* ─── Grimoire pleine largeur, centré verticalement ─── */}
+      <div className="max-w-7xl w-full mx-auto flex-1 flex flex-col items-center justify-center">
+        <div className="text-center mb-3">
           <div className="inline-flex items-center gap-2 text-stone-400 text-xs tracking-[0.3em] uppercase">
             <BookOpen className="w-3 h-3" /> Grimoire
           </div>
         </div>
-        <div className="relative mx-auto" style={{ width: size, height: size, maxWidth: "100%" }}>
+        <div className="relative" style={{ width: size, height: size, maxWidth: "100%" }}>
           <div className="absolute inset-12 rounded-full ring-1 ring-stone-700/40" />
           <div className="absolute inset-20 rounded-full ring-1 ring-stone-800/40" />
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -569,6 +572,15 @@ function StorytellerView({ game, me, dispatch, onLeave }: any) {
         </div>
       </div>
 
+      {/* ─── Backdrop : tape à côté du drawer pour le fermer ─── */}
+      {panelOpen && (
+        <div
+          onClick={closePanel}
+          className="fixed inset-0 z-20 bg-black/40 backdrop-blur-[2px] transition-opacity"
+          aria-hidden
+        />
+      )}
+
       {/* ─── Drawer rétractable ─── */}
       <aside
         aria-hidden={!panelOpen}
@@ -576,10 +588,17 @@ function StorytellerView({ game, me, dispatch, onLeave }: any) {
           panelOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-stone-800 sticky top-0 bg-stone-950/95 backdrop-blur-md">
+        <div
+          className="flex items-center justify-between px-4 py-3 border-b border-stone-800 sticky top-0 bg-stone-950/95 backdrop-blur-md z-10"
+          style={{ paddingTop: "max(env(safe-area-inset-top), 0.75rem)" }}
+        >
           <div className="text-stone-400 text-xs uppercase tracking-[0.2em]">Panneau</div>
-          <button onClick={closePanel} className="text-stone-400 hover:text-stone-100 p-1">
-            <X className="w-4 h-4" />
+          <button
+            onClick={closePanel}
+            aria-label="Fermer le panneau"
+            className="text-stone-300 hover:text-stone-100 p-2 -mr-1 ring-1 ring-stone-700 hover:ring-stone-500 transition-colors"
+          >
+            <X className="w-5 h-5" />
           </button>
         </div>
 
