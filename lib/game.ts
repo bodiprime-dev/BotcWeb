@@ -37,6 +37,7 @@ export function applyAction(state: GameState, action: GameAction): GameState {
         id: nanoid(8),
         name: trimmed,
         role: null,
+        displayRole: null,
         alive: true,
         isStoryteller: false,
         poisoned: false,
@@ -55,20 +56,34 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       const script = SCRIPTS[state.scriptId];
       if (!script) return state;
 
-      // Utilise les rôles sélectionnés si assez ; sinon tire au sort parmi tout le script
-      const pool = action.selectedRoleIds.length >= state.players.length
+      // Le GM ne joue pas — on assigne des rôles uniquement aux non-storyteller
+      const playablePlayers = state.players.filter(p => p.id !== action.storytellerId);
+      const playerCount = playablePlayers.length;
+
+      // Pool de rôles : sélection si suffisante, sinon tirage au sort dans tout le script
+      const pool = action.selectedRoleIds.length >= playerCount
         ? action.selectedRoleIds
         : Object.keys(script.roles);
 
       const assignedRoles = [...pool]
         .sort(() => Math.random() - 0.5)
-        .slice(0, state.players.length);
+        .slice(0, playerCount);
 
-      const players = state.players.map((p, i) => ({
-        ...p,
-        role: assignedRoles[i],
-        isStoryteller: p.id === action.storytellerId,
-      }));
+      let roleIdx = 0;
+      const players = state.players.map((p) => {
+        if (p.id === action.storytellerId) {
+          // GM = pas de rôle
+          return { ...p, role: null, displayRole: null, isStoryteller: true };
+        }
+        const realRole = assignedRoles[roleIdx++];
+        const isDrunk = realRole === "drunk";
+        return {
+          ...p,
+          role: realRole,
+          displayRole: isDrunk && action.drunkFakeRoleId ? action.drunkFakeRoleId : realRole,
+          isStoryteller: false,
+        };
+      });
 
       return {
         ...state,
@@ -90,10 +105,7 @@ export function applyAction(state: GameState, action: GameAction): GameState {
             ? { ...p, alive: !p.alive, poisoned: p.alive ? false : p.poisoned }
             : p
         ),
-        // Retire la nomination si ce joueur était nominé
-        nominee: state.nominee === action.playerId
-          ? null
-          : state.nominee,
+        nominee: state.nominee === action.playerId ? null : state.nominee,
       };
     }
 
@@ -124,6 +136,8 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       const nominator = state.players.find(p => p.id === action.nominatorId);
       const nominee = state.players.find(p => p.id === action.nomineeId);
       if (!nominator || !nominee || !nominator.alive || !nominee.alive) return state;
+      // Le GM ne peut pas nominer
+      if (nominator.isStoryteller) return state;
       return { ...state, nominee: action.nomineeId, votes: {} };
     }
 
@@ -137,16 +151,22 @@ export function applyAction(state: GameState, action: GameAction): GameState {
   }
 }
 
-// Vue restreinte pour un joueur (sans les rôles des autres)
+// Vue restreinte côté joueur :
+// - le joueur voit son displayRole (rôle fictif si Drunk)
+// - les autres joueurs apparaissent SANS rôle (sauf pour le GM qui voit tout)
 export function getPlayerView(state: GameState, playerId: string): PlayerView | null {
   const me = state.players.find(p => p.id === playerId);
   if (!me) return null;
+
+  // Côté GM : on lui donne le vrai rôle des autres dans `role`
+  // Côté joueur normal : `role` = null (privé)
   const others = state.players
     .filter(p => p.id !== playerId)
     .map(p => ({
       ...p,
       role: me.isStoryteller ? p.role : null,
     })) as PlayerView["others"];
+
   return {
     code: state.code,
     scriptId: state.scriptId,
