@@ -4,6 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import {
   Moon, Sun, Eye, EyeOff, Skull, BookOpen, Users, ArrowLeft,
   Sparkles, UserPlus, Crown, FlaskConical, Gavel, X, ChevronDown, ChevronUp,
+  PanelRightOpen, PanelRightClose,
 } from "lucide-react";
 import { SCRIPTS, TEAM_COLORS, type Team } from "@/data/scripts";
 import { getPusherClient, channelName } from "@/lib/pusher-client";
@@ -168,9 +169,13 @@ function ScriptReference({ scriptId, onClose }: { scriptId: string; onClose: () 
               <div className="space-y-2">
                 {roles.map(([id, role]) => {
                   const open = expanded === id;
+                  // ─── PATCH : quand un rôle est sélectionné, on ne bascule plus
+                  // sur `tc.bg` (qui était `bg-stone-100` = blanc pétant pour
+                  // les Bons). On garde un fond sombre, et on signale la
+                  // sélection par un fond stone-800 + le ring d'équipe.
                   return (
                     <div key={id}
-                      className={`ring-1 transition-all cursor-pointer ${open ? `${tc.bg} ${tc.ring}` : "bg-stone-900 ring-stone-800"}`}
+                      className={`ring-1 transition-all cursor-pointer ${open ? `bg-stone-800/70 ${tc.ring}` : "bg-stone-900 ring-stone-800"}`}
                       onClick={() => setExpanded(open ? null : id)}>
                       <div className="flex items-center gap-3 px-4 py-3">
                         <div className={`w-2 h-2 rounded-full flex-shrink-0 ${tc.accent}`} />
@@ -315,7 +320,7 @@ function Lobby({ game, me, dispatch, onLeave }: any) {
                       return (
                         <button key={id} onClick={() => toggleRole(id)}
                           className={`w-full flex items-center gap-3 px-3 py-2.5 ring-1 transition-all text-left ${
-                            checked ? `${tc.bg} ${tc.ring} ${tc.text}` : "bg-stone-900 ring-stone-800 text-stone-400 hover:ring-stone-600"
+                            checked ? `bg-stone-800/70 ${tc.ring} ${tc.text}` : "bg-stone-900 ring-stone-800 text-stone-400 hover:ring-stone-600"
                           }`}>
                           <div className={`w-4 h-4 flex-shrink-0 border flex items-center justify-center text-[10px] font-bold transition-all ${
                             checked ? `${tc.accent} border-transparent text-stone-100` : "border-stone-600 bg-transparent"
@@ -362,7 +367,7 @@ function Lobby({ game, me, dispatch, onLeave }: any) {
                 return (
                   <button key={role.id} onClick={() => setDrunkFakeRoleId(role.id)}
                     className={`w-full flex items-center gap-3 px-4 py-3 ring-1 text-left transition-all ${
-                      sel ? `${tc.bg} ring-amber-700/60 ${tc.text}` : "bg-stone-900 ring-stone-800 text-stone-300 hover:ring-stone-600"
+                      sel ? `bg-stone-800/70 ring-amber-700/60 ${tc.text}` : "bg-stone-900 ring-stone-800 text-stone-300 hover:ring-stone-600"
                     }`}>
                     <div className={`w-4 h-4 rounded-full flex-shrink-0 border-2 flex items-center justify-center transition-all ${
                       sel ? "border-amber-700 bg-amber-700" : "border-stone-600"
@@ -405,9 +410,30 @@ function Lobby({ game, me, dispatch, onLeave }: any) {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+//  StorytellerView : table + drawer rétractable
+//
+//  Refonte ergo :
+//    - Le Grimoire (cercle) prend par défaut TOUTE la largeur (max-w-7xl)
+//    - La sidebar devient un `drawer` à droite, masqué par défaut
+//    - On ouvre le drawer :
+//        (a) automatiquement quand on tape un joueur
+//        (b) manuellement via le bouton `Panneau` du header
+//        (c) automatiquement en phase `night` pour voir l'ordre nocturne
+//          (mais on peut le fermer)
+//    - Quand le drawer est fermé, le rayon du cercle est plus grand
+//      (`Math.min(320, …)`) → vraie sensation de "vue d'ensemble"
+//    - Quand le drawer est ouvert, le rayon est réduit (`Math.min(220, …)`)
+//      pour laisser physiquement la place au panneau (lg+)
+//
+//  L'ouverture auto en phase nuit est utile car le Conteur veut voir l'ordre
+//  ET le cercle en même temps. Mais l'utilisateur peut fermer pour gagner
+//  de l'espace, c'est juste un défaut.
+// ═══════════════════════════════════════════════════════════════════════
 function StorytellerView({ game, me, dispatch, onLeave }: any) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showScript, setShowScript] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
   const script = SCRIPTS[game.scriptId];
   const ROLES = script.roles;
   const selected = game.players.find((p: any) => p.id === selectedId);
@@ -430,27 +456,45 @@ function StorytellerView({ game, me, dispatch, onLeave }: any) {
     .filter(Boolean)
     .sort((a: any, b: any) => a.order - b.order);
 
-  const radius = Math.min(180, 60 + playablePlayers.length * 12);
+  // Ouverture auto quand on sélectionne un joueur (pour révéler les actions)
+  useEffect(() => {
+    if (selectedId) setPanelOpen(true);
+  }, [selectedId]);
+
+  // Ouverture auto au passage en phase nuit (utile pour l'ordre nocturne)
+  useEffect(() => {
+    if (game.phase === "night") setPanelOpen(true);
+  }, [game.phase]);
+
+  // Rayon du cercle adaptatif : plus grand quand le drawer est fermé
+  const baseExtent = 80 + playablePlayers.length * 16;
+  const radius = Math.min(panelOpen ? 220 : 320, baseExtent);
   const center = radius + 60;
   const size = center * 2;
 
+  const closePanel = () => {
+    setSelectedId(null);
+    setPanelOpen(false);
+  };
+
   return (
-    <div className="min-h-screen p-4 pb-8">
+    <div className="min-h-[100dvh] px-2 sm:px-4 pb-6 pt-3">
       {showScript && <ScriptReference scriptId={game.scriptId} onClose={() => setShowScript(false)} />}
 
-      <div className="flex items-center justify-between mb-4 max-w-6xl mx-auto">
+      {/* ─── Header ─── */}
+      <div className="flex items-center justify-between mb-4 max-w-7xl mx-auto gap-2">
         <button onClick={onLeave} className="flex items-center gap-2 text-stone-400 hover:text-stone-200">
-          <ArrowLeft className="w-4 h-4" /> <span className="text-sm">Quitter</span>
+          <ArrowLeft className="w-4 h-4" /> <span className="text-sm hidden sm:inline">Quitter</span>
         </button>
-        <div className="text-stone-500 text-xs tracking-[0.2em] uppercase hidden sm:block">
+        <div className="text-stone-500 text-xs tracking-[0.2em] uppercase hidden md:block">
           Conteur · {game.code}
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setShowScript(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 ring-1 ring-stone-700 bg-stone-900 hover:bg-stone-800 text-stone-400 hover:text-stone-200 text-xs uppercase tracking-wider">
-            <BookOpen className="w-3 h-3" /> Rôles
+            <BookOpen className="w-3 h-3" /> <span className="hidden sm:inline">Rôles</span>
           </button>
-          <div className="text-stone-400 text-xs tracking-[0.2em] uppercase">
+          <div className="text-stone-400 text-xs tracking-[0.2em] uppercase hidden sm:block">
             {game.phase === "day" ? "Jour" : "Nuit"} {game.day}
           </div>
           <button onClick={() => dispatch({ type: "TOGGLE_PHASE", storytellerId: me.id })}
@@ -460,101 +504,127 @@ function StorytellerView({ game, me, dispatch, onLeave }: any) {
             {game.phase === "day" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             <span className="text-sm">{game.phase === "day" ? "Jour" : "Nuit"}</span>
           </button>
+          {/* ─── Toggle drawer ─── */}
+          <button
+            onClick={() => setPanelOpen(o => !o)}
+            aria-label={panelOpen ? "Fermer le panneau" : "Ouvrir le panneau"}
+            className={`flex items-center justify-center w-10 h-10 ring-1 transition-all ${
+              panelOpen
+                ? "bg-amber-950/40 ring-amber-700/50 text-amber-200"
+                : "bg-stone-900 ring-stone-700 text-stone-400 hover:text-stone-200"
+            }`}>
+            {panelOpen ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
+          </button>
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto grid lg:grid-cols-[1fr_320px] gap-6">
-        <div className="relative">
-          <div className="text-center mb-2">
-            <div className="inline-flex items-center gap-2 text-stone-400 text-xs tracking-[0.3em] uppercase">
-              <BookOpen className="w-3 h-3" /> Grimoire
-            </div>
-          </div>
-          <div className="relative mx-auto" style={{ width: size, height: size, maxWidth: "100%" }}>
-            <div className="absolute inset-12 rounded-full ring-1 ring-stone-700/40" />
-            <div className="absolute inset-20 rounded-full ring-1 ring-stone-800/40" />
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <Skull className="w-10 h-10 text-stone-700" strokeWidth={1.2} />
-            </div>
-            {playablePlayers.map((p: any, i: number) => {
-              const angle = (i / playablePlayers.length) * 2 * Math.PI - Math.PI / 2;
-              const x = center + radius * Math.cos(angle) - 36;
-              const y = center + radius * Math.sin(angle) - 36;
-              const role = ROLES[p.role!];
-              const team = TEAM_COLORS[role.team as Team];
-              const isNominee = game.nominee === p.id;
-              const isDrunk = p.role === "drunk";
-              return (
-                <button key={p.id} onClick={() => setSelectedId(p.id === selectedId ? null : p.id)}
-                  className="absolute" style={{ left: x, top: y }}>
-                  <div className={`w-[72px] h-[72px] rounded-full ${team.bg} ring-2 flex flex-col items-center justify-center transition-all relative ${
-                    selectedId === p.id ? "scale-110 ring-amber-400"
-                    : isNominee ? "ring-orange-400"
-                    : team.ring
-                  } ${!p.alive ? "opacity-40 grayscale" : ""}`}>
-                    <div className={`text-[10px] font-bold ${team.text} px-1 text-center leading-tight`}>
-                      {role.name}{isDrunk ? " 🍺" : ""}
-                    </div>
-                    {!p.alive && <Skull className="w-4 h-4 text-stone-700 absolute" />}
-                    {p.poisoned && p.alive && (
-                      <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-purple-800 ring-1 ring-purple-600 flex items-center justify-center">
-                        <FlaskConical className="w-2.5 h-2.5 text-purple-200" />
-                      </div>
-                    )}
-                    {isNominee && p.alive && (
-                      <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-orange-800 ring-1 ring-orange-600 flex items-center justify-center">
-                        <Gavel className="w-2.5 h-2.5 text-orange-200" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="text-center mt-1 text-stone-200 text-xs">{p.name}</div>
-                </button>
-              );
-            })}
+      {/* ─── Grimoire pleine largeur ─── */}
+      <div className="max-w-7xl mx-auto">
+        <div className="text-center mb-2">
+          <div className="inline-flex items-center gap-2 text-stone-400 text-xs tracking-[0.3em] uppercase">
+            <BookOpen className="w-3 h-3" /> Grimoire
           </div>
         </div>
+        <div className="relative mx-auto" style={{ width: size, height: size, maxWidth: "100%" }}>
+          <div className="absolute inset-12 rounded-full ring-1 ring-stone-700/40" />
+          <div className="absolute inset-20 rounded-full ring-1 ring-stone-800/40" />
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <Skull className="w-10 h-10 text-stone-700" strokeWidth={1.2} />
+          </div>
+          {playablePlayers.map((p: any, i: number) => {
+            const angle = (i / playablePlayers.length) * 2 * Math.PI - Math.PI / 2;
+            const x = center + radius * Math.cos(angle) - 36;
+            const y = center + radius * Math.sin(angle) - 36;
+            const role = ROLES[p.role!];
+            const team = TEAM_COLORS[role.team as Team];
+            const isNominee = game.nominee === p.id;
+            const isDrunk = p.role === "drunk";
+            return (
+              <button key={p.id} onClick={() => setSelectedId(p.id === selectedId ? null : p.id)}
+                className="absolute" style={{ left: x, top: y }}>
+                <div className={`w-[72px] h-[72px] rounded-full ${team.bg} ring-2 flex flex-col items-center justify-center transition-all relative ${
+                  selectedId === p.id ? "scale-110 ring-amber-400"
+                  : isNominee ? "ring-orange-400"
+                  : team.ring
+                } ${!p.alive ? "opacity-40 grayscale" : ""}`}>
+                  <div className={`text-[10px] font-bold ${team.text} px-1 text-center leading-tight`}>
+                    {role.name}{isDrunk ? " 🍺" : ""}
+                  </div>
+                  {!p.alive && <Skull className="w-4 h-4 text-stone-700 absolute" />}
+                  {p.poisoned && p.alive && (
+                    <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-purple-800 ring-1 ring-purple-600 flex items-center justify-center">
+                      <FlaskConical className="w-2.5 h-2.5 text-purple-200" />
+                    </div>
+                  )}
+                  {isNominee && p.alive && (
+                    <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-orange-800 ring-1 ring-orange-600 flex items-center justify-center">
+                      <Gavel className="w-2.5 h-2.5 text-orange-200" />
+                    </div>
+                  )}
+                </div>
+                <div className="text-center mt-1 text-stone-200 text-xs">{p.name}</div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
-        <aside className="space-y-3">
+      {/* ─── Drawer rétractable ─── */}
+      <aside
+        aria-hidden={!panelOpen}
+        className={`fixed inset-y-0 right-0 w-full sm:max-w-sm z-30 bg-stone-950/95 backdrop-blur-md ring-1 ring-stone-800 overflow-y-auto transition-transform duration-300 ease-out ${
+          panelOpen ? "translate-x-0" : "translate-x-full"
+        }`}
+      >
+        <div className="flex items-center justify-between px-4 py-3 border-b border-stone-800 sticky top-0 bg-stone-950/95 backdrop-blur-md">
+          <div className="text-stone-400 text-xs uppercase tracking-[0.2em]">Panneau</div>
+          <button onClick={closePanel} className="text-stone-400 hover:text-stone-100 p-1">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="p-3 space-y-3">
           {selected ? (
-            <div className="bg-stone-100 text-stone-900 p-4 ring-1 ring-stone-400">
+            // ─── Card joueur sélectionné (PATCH : fond sombre, plus de blanc) ─
+            <div className="bg-stone-900 text-stone-100 p-4 ring-1 ring-amber-900/40">
               <div className="flex items-start justify-between mb-3">
                 <div>
-                  <div className="text-xs uppercase text-stone-600">Joueur</div>
-                  <div className="text-2xl">{selected.name}</div>
+                  <div className="text-xs uppercase text-stone-400">Joueur</div>
+                  <div className="text-2xl text-stone-100">{selected.name}</div>
                   {selected.role === "drunk" && (
-                    <div className="text-xs text-amber-700 mt-0.5">
+                    <div className="text-xs text-amber-300 mt-0.5">
                       🍺 Drunk — pense être {ROLES[selected.displayRole!]?.name}
                     </div>
                   )}
                 </div>
-                <button onClick={() => setSelectedId(null)} className="text-stone-400 hover:text-stone-600 p-1">
+                <button onClick={() => setSelectedId(null)} className="text-stone-400 hover:text-stone-100 p-1">
                   <X className="w-4 h-4" />
                 </button>
               </div>
-              <div className="border-t border-stone-300 pt-3 mb-3">
+              <div className="border-t border-stone-700 pt-3 mb-3">
                 <div className="flex items-center gap-2 mb-1">
                   <span className={`w-2 h-2 rounded-full ${TEAM_COLORS[ROLES[selected.role!].team as Team].accent}`} />
-                  <span className="text-xs uppercase text-stone-700">
+                  <span className="text-xs uppercase text-stone-300">
                     {TEAM_COLORS[ROLES[selected.role!].team as Team].label}
                   </span>
                 </div>
-                <div className="text-lg italic mb-1">{ROLES[selected.role!].name}</div>
-                <p className="text-xs text-stone-600 leading-relaxed">{ROLES[selected.role!].ability}</p>
+                <div className={`text-lg italic mb-1 ${TEAM_COLORS[ROLES[selected.role!].team as Team].text}`}>{ROLES[selected.role!].name}</div>
+                <p className="text-xs text-stone-400 leading-relaxed">{ROLES[selected.role!].ability}</p>
               </div>
               <div className="grid grid-cols-3 gap-2">
                 <button onClick={() => dispatch({ type: "TOGGLE_ALIVE", playerId: selected.id, storytellerId: me.id })}
                   className={`flex flex-col items-center gap-1 p-2 ring-1 text-xs uppercase tracking-wide transition-all ${
-                    !selected.alive ? "bg-stone-800 ring-stone-600 text-stone-300" : "bg-stone-200 ring-stone-300 text-stone-700 hover:bg-stone-300"
+                    !selected.alive ? "bg-stone-800 ring-stone-600 text-stone-300" : "bg-stone-800 ring-stone-700 text-stone-200 hover:bg-stone-700"
                   }`}>
                   {selected.alive
-                    ? <Sparkles className="w-4 h-4 text-amber-700" />
-                    : <Skull className="w-4 h-4 text-stone-500" />}
+                    ? <Sparkles className="w-4 h-4 text-amber-400" />
+                    : <Skull className="w-4 h-4 text-stone-400" />}
                   {selected.alive ? "Tuer" : "Vivant"}
                 </button>
                 <button onClick={() => selected.alive && dispatch({ type: "TOGGLE_POISON", playerId: selected.id, storytellerId: me.id })}
                   disabled={!selected.alive}
                   className={`flex flex-col items-center gap-1 p-2 ring-1 text-xs uppercase tracking-wide transition-all disabled:opacity-40 ${
-                    selected.poisoned ? "bg-purple-900 ring-purple-700 text-purple-200" : "bg-stone-200 ring-stone-300 text-stone-700 hover:bg-purple-100"
+                    selected.poisoned ? "bg-purple-900 ring-purple-700 text-purple-200" : "bg-stone-800 ring-stone-700 text-stone-200 hover:bg-purple-900/40"
                   }`}>
                   <FlaskConical className="w-4 h-4" />
                   {selected.poisoned ? "Empoisonné" : "Empoisonner"}
@@ -566,7 +636,7 @@ function StorytellerView({ game, me, dispatch, onLeave }: any) {
                   })}
                   disabled={!selected.alive}
                   className={`flex flex-col items-center gap-1 p-2 ring-1 text-xs uppercase tracking-wide transition-all disabled:opacity-40 ${
-                    game.nominee === selected.id ? "bg-orange-900 ring-orange-700 text-orange-200" : "bg-stone-200 ring-stone-300 text-stone-700 hover:bg-orange-100"
+                    game.nominee === selected.id ? "bg-orange-900 ring-orange-700 text-orange-200" : "bg-stone-800 ring-stone-700 text-stone-200 hover:bg-orange-900/40"
                   }`}>
                   <Gavel className="w-4 h-4" />
                   {game.nominee === selected.id ? "Nominé" : "Nominer"}
@@ -574,9 +644,10 @@ function StorytellerView({ game, me, dispatch, onLeave }: any) {
               </div>
             </div>
           ) : (
-            <div className="bg-stone-100 text-stone-900 p-4 ring-1 ring-stone-400 text-center">
-              <BookOpen className="w-7 h-7 mx-auto mb-2 text-stone-600" />
-              <p className="text-sm italic text-stone-600">Touche un joueur pour le gérer</p>
+            // ─── Placeholder (PATCH : fond sombre cohérent) ──────────────────
+            <div className="bg-stone-900 text-stone-300 p-4 ring-1 ring-stone-700 text-center">
+              <BookOpen className="w-7 h-7 mx-auto mb-2 text-stone-500" />
+              <p className="text-sm italic text-stone-500">Touche un joueur pour le gérer</p>
             </div>
           )}
 
@@ -594,6 +665,8 @@ function StorytellerView({ game, me, dispatch, onLeave }: any) {
           )}
 
           {game.phase === "night" && (
+            // ─── Ordre de la nuit (PATCH : couleurs lisibles grâce au nouveau
+            // tc.text qui n'est plus `text-amber-950`/presque-noir) ──────────
             <div className="bg-indigo-950/60 ring-1 ring-indigo-900 p-4">
               <div className="text-indigo-300 text-xs uppercase tracking-[0.2em] mb-3 flex items-center gap-2">
                 <Moon className="w-3 h-3" /> Ordre de la nuit {game.day}
@@ -626,8 +699,8 @@ function StorytellerView({ game, me, dispatch, onLeave }: any) {
               )}
             </div>
           )}
-        </aside>
-      </div>
+        </div>
+      </aside>
     </div>
   );
 }
@@ -641,6 +714,10 @@ function PlayerView({ game, me, dispatch, onLeave }: any) {
 
   const displayRoleId = me.displayRole || me.role;
   const myRole = ROLES[displayRoleId!];
+  // ─── PATCH : on récupère encore `team` pour le label uniquement,
+  //   mais on n'utilise plus `team.accent` comme fond du badge — sinon
+  //   le badge serait rouge vif pour un Démon, ce qui trahit l'équipe
+  //   d'un coup d'œil à la vue d'un voisin.
   const team = TEAM_COLORS[myRole.team as Team];
 
   return (
@@ -659,22 +736,26 @@ function PlayerView({ game, me, dispatch, onLeave }: any) {
       </div>
 
       <div className="max-w-3xl mx-auto">
-        <div className="bg-stone-100 text-stone-900 p-8 ring-1 ring-stone-400 mb-4">
+        {/* ─── Card du rôle (PATCH : fond sombre parchemin) ─────────────── */}
+        <div className="bg-stone-900/90 text-stone-100 p-8 ring-1 ring-amber-900/40 mb-4">
           <div className="text-center">
-            <div className="text-xs uppercase text-stone-600 mb-1">
+            <div className="text-xs uppercase text-stone-400 mb-1">
               Bonjour {me.name}, ton rôle est
             </div>
             {revealed ? (
               <>
                 <div className="my-4">
-                  <div className={`inline-flex items-center gap-2 px-3 py-1 ${team.accent} text-stone-50 text-[10px] uppercase tracking-[0.3em]`}>
-                    <span className="w-1 h-1 bg-stone-200 rounded-full" />{team.label}
+                  {/* ─── Badge équipe NEUTRALISÉ : même style sépia pour
+                      Townsfolk / Outsider / Minion / Démon. Seul le `label`
+                      (texte) discrimine — il faut être proche pour le lire. */}
+                  <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-950/60 ring-1 ring-amber-800/40 text-amber-200/80 text-[10px] uppercase tracking-[0.3em]">
+                    <span className="w-1 h-1 bg-amber-500/70 rounded-full" />{team.label}
                   </div>
                 </div>
-                <h2 className="text-5xl mb-4 italic">{myRole.name}</h2>
-                <div className="text-left max-w-md mx-auto bg-stone-200/60 ring-1 ring-stone-300 p-4 mb-4">
-                  <div className="text-xs uppercase text-stone-500 tracking-wider mb-2">Capacité</div>
-                  <p className="text-stone-800 leading-relaxed text-sm">{myRole.ability}</p>
+                <h2 className="text-5xl mb-4 italic text-amber-100">{myRole.name}</h2>
+                <div className="text-left max-w-md mx-auto bg-stone-950/60 ring-1 ring-stone-700 p-4 mb-4">
+                  <div className="text-xs uppercase text-amber-500/70 tracking-wider mb-2">Capacité</div>
+                  <p className="text-stone-200 leading-relaxed text-sm">{myRole.ability}</p>
                 </div>
                 {(myRole.firstNight || myRole.otherNight) && (
                   <div className="max-w-md mx-auto text-xs text-stone-500 flex gap-4 justify-center mb-4">
@@ -683,7 +764,7 @@ function PlayerView({ game, me, dispatch, onLeave }: any) {
                   </div>
                 )}
                 <button onClick={() => setRevealed(false)}
-                  className="text-xs uppercase text-stone-600 hover:text-stone-900 inline-flex items-center gap-2">
+                  className="text-xs uppercase text-stone-400 hover:text-stone-100 inline-flex items-center gap-2">
                   <EyeOff className="w-3 h-3" /> Cacher
                 </button>
               </>
@@ -692,7 +773,7 @@ function PlayerView({ game, me, dispatch, onLeave }: any) {
                 <div className="w-32 h-32 mx-auto bg-stone-800 ring-2 ring-stone-600 flex items-center justify-center hover:bg-stone-700 transition-all">
                   <Eye className="w-12 h-12 text-stone-300" strokeWidth={1.2} />
                 </div>
-                <div className="mt-4 text-xs uppercase tracking-[0.3em] text-stone-600">Toucher pour révéler</div>
+                <div className="mt-4 text-xs uppercase tracking-[0.3em] text-stone-400">Toucher pour révéler</div>
               </button>
             )}
           </div>

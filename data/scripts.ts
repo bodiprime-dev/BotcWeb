@@ -97,11 +97,32 @@ export const SCRIPTS: Record<string, Script> = {
   "bad-moon-rising": BAD_MOON_RISING,
 };
 
+// ─── Palette d'équipes ─────────────────────────────────────────────────
+//
+// Cette palette est partagée par TOUS les usages (cercle Conteur, sidebar
+// nuit, modal de référence, badge sur la vue joueur, sélecteur de rôles
+// dans le lobby, etc.). C'est donc le levier le plus efficace pour
+// homogénéiser le rendu.
+//
+// Choix de design :
+//  - `bg`   est uniformément `bg-stone-900` → de loin (>1m), tous les rôles
+//           se ressemblent. On ne peut PAS deviner bien/mal d'un coup d'œil
+//           sur l'écran d'un voisin.
+//  - `ring` porte la signature subtile (ambre/rouge, opacité modérée). Vue
+//           de près, le Conteur la repère, mais elle ne saute pas aux yeux.
+//  - `text` reste haut-contraste sur fond sombre — les noms de rôles
+//           écrits dans la sidebar nuit (fond `bg-indigo-950/60`) sont
+//           maintenant tous lisibles, contrairement à l'ancien
+//           `text-amber-950` (presque noir sur bleu marine = invisible).
+//  - `accent` garde une teinte forte. Sert aux pastilles numériques de
+//           l'ordre de nuit, aux petits points colorés, etc. — éléments
+//           ponctuels qui aident le Conteur à scanner sans dominer l'UI.
+//
 export const TEAM_COLORS: Record<Team, { bg: string; ring: string; text: string; label: string; accent: string }> = {
-  townsfolk: { bg: "bg-stone-100",  ring: "ring-amber-700/40", text: "text-amber-950", label: "Townsfolk", accent: "bg-amber-700" },
-  outsider:  { bg: "bg-stone-100",  ring: "ring-amber-700/40", text: "text-amber-950", label: "Outsider",  accent: "bg-amber-600" },
-  minion:    { bg: "bg-red-950/80", ring: "ring-red-900",      text: "text-red-50",    label: "Minion",    accent: "bg-red-800" },
-  demon:     { bg: "bg-red-950",    ring: "ring-red-700",      text: "text-red-50",    label: "Démon",     accent: "bg-red-700" },
+  townsfolk: { bg: "bg-stone-900", ring: "ring-amber-800/50", text: "text-amber-200", label: "Townsfolk", accent: "bg-amber-700" },
+  outsider:  { bg: "bg-stone-900", ring: "ring-amber-600/40", text: "text-amber-100", label: "Outsider",  accent: "bg-amber-500" },
+  minion:    { bg: "bg-stone-900", ring: "ring-red-900/60",   text: "text-red-300",   label: "Minion",    accent: "bg-red-800" },
+  demon:     { bg: "bg-stone-900", ring: "ring-red-700/70",   text: "text-rose-200",  label: "Démon",     accent: "bg-red-700" },
 };
 
 export const getScriptList = () =>
