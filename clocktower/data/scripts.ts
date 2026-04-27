@@ -97,11 +97,11 @@ export const SCRIPTS: Record<string, Script> = {
   "bad-moon-rising": BAD_MOON_RISING,
 };
 
-export const TEAM_COLORS: Record<Team, { bg: string; ring: string; text: string; label: string; accent: string }> = {
-  townsfolk: { bg: "bg-stone-100",  ring: "ring-amber-700/40", text: "text-amber-950", label: "Townsfolk", accent: "bg-amber-700" },
-  outsider:  { bg: "bg-stone-100",  ring: "ring-amber-700/40", text: "text-amber-950", label: "Outsider",  accent: "bg-amber-600" },
-  minion:    { bg: "bg-red-950/80", ring: "ring-red-900",      text: "text-red-50",    label: "Minion",    accent: "bg-red-800" },
-  demon:     { bg: "bg-red-950",    ring: "ring-red-700",      text: "text-red-50",    label: "Démon",     accent: "bg-red-700" },
+export const TEAM_COLORS: Record<Team, { bg: string; ring: string; text: string; label: string; accent: string; dot: string }> = {
+  townsfolk: { bg: "bg-sky-950",    ring: "ring-sky-400",    text: "text-sky-200",    label: "Townsfolk", accent: "bg-sky-600",    dot: "bg-sky-400" },
+  outsider:  { bg: "bg-violet-950", ring: "ring-violet-400", text: "text-violet-200", label: "Outsider",  accent: "bg-violet-600", dot: "bg-violet-400" },
+  minion:    { bg: "bg-orange-950", ring: "ring-orange-400", text: "text-orange-200", label: "Minion",    accent: "bg-orange-600", dot: "bg-orange-400" },
+  demon:     { bg: "bg-red-950",    ring: "ring-red-400",    text: "text-red-200",    label: "Démon",     accent: "bg-red-600",    dot: "bg-red-400" },
 };
 
 export const getScriptList = () =>
