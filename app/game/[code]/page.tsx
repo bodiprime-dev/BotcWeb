@@ -9,18 +9,22 @@ import {
 import { SCRIPTS, TEAM_COLORS, type Team } from "@/data/scripts";
 
 function RoleIcon({ roleId, size = 40, className = "" }: { roleId: string; size?: number; className?: string }) {
-  const [failed, setFailed] = useState(false);
-  if (failed) return null;
+  const [state, setState] = useState<"loading" | "ok" | "failed">("loading");
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={`https://raw.githubusercontent.com/bra1n/townsquare/develop/src/roles/${roleId}.png`}
-      alt=""
-      width={size}
-      height={size}
-      className={`object-contain ${className}`}
-      onError={() => setFailed(true)}
-    />
+    <>
+      {state !== "failed" && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={`https://raw.githubusercontent.com/bra1n/townsquare/develop/src/roles/${roleId}.png`}
+          alt=""
+          width={size}
+          height={size}
+          className={`object-contain ${state === "loading" ? "opacity-0 absolute" : ""} ${className}`}
+          onLoad={() => setState("ok")}
+          onError={() => setState("failed")}
+        />
+      )}
+    </>
   );
 }
 import { getPusherClient, channelName } from "@/lib/pusher-client";
@@ -563,15 +567,15 @@ function StorytellerView({ game, me, dispatch, onLeave }: any) {
             return (
               <button key={p.id} onClick={() => setSelectedId(p.id === selectedId ? null : p.id)}
                 className="absolute" style={{ left: x, top: y }}>
-                <div className={`w-[72px] h-[72px] rounded-full ${team.bg} ring-2 flex items-center justify-center transition-all relative ${
+                <div className={`w-[72px] h-[72px] rounded-full ${team.bg} ring-2 flex flex-col items-center justify-center transition-all relative ${
                   selectedId === p.id ? "scale-110 ring-amber-400"
                   : isNominee ? "ring-orange-400"
                   : team.ring
                 } ${!p.alive ? "opacity-40 grayscale" : ""}`}>
-                  <RoleIcon roleId={p.role!} size={52} />
-                  {isDrunk && (
-                    <span className="absolute top-0.5 left-0.5 text-xs leading-none">🍺</span>
-                  )}
+                  <RoleIcon roleId={p.role!} size={46} />
+                  <div className={`text-[8px] font-medium ${team.text} px-1 text-center leading-tight`}>
+                    {role.name}{isDrunk ? " 🍺" : ""}
+                  </div>
                   {!p.alive && (
                     <div className="absolute inset-0 rounded-full bg-stone-900/70 flex items-center justify-center">
                       <Skull className="w-6 h-6 text-stone-500" />
@@ -588,10 +592,7 @@ function StorytellerView({ game, me, dispatch, onLeave }: any) {
                     </div>
                   )}
                 </div>
-                <div className="text-center mt-1">
-                  <div className={`text-[9px] leading-tight ${team.text} opacity-70`}>{role.name}</div>
-                  <div className="text-stone-200 text-xs">{p.name}</div>
-                </div>
+                <div className="text-center mt-1 text-stone-200 text-xs">{p.name}</div>
               </button>
             );
           })}
