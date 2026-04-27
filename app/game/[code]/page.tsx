@@ -7,6 +7,26 @@ import {
   PanelRightOpen, PanelRightClose,
 } from "lucide-react";
 import { SCRIPTS, TEAM_COLORS, type Team } from "@/data/scripts";
+
+function RoleIcon({ roleId, size = 40, className = "" }: { roleId: string; size?: number; className?: string }) {
+  const [state, setState] = useState<"loading" | "ok" | "failed">("loading");
+  return (
+    <>
+      {state !== "failed" && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={`https://raw.githubusercontent.com/bra1n/townsquare/develop/src/roles/${roleId}.png`}
+          alt=""
+          width={size}
+          height={size}
+          className={`object-contain ${state === "loading" ? "opacity-0 absolute" : ""} ${className}`}
+          onLoad={() => setState("ok")}
+          onError={() => setState("failed")}
+        />
+      )}
+    </>
+  );
+}
 import { getPusherClient, channelName } from "@/lib/pusher-client";
 import type { GameState, GameAction } from "@/lib/types";
 
@@ -177,9 +197,9 @@ function ScriptReference({ scriptId, onClose }: { scriptId: string; onClose: () 
                     <div key={id}
                       className={`ring-1 transition-all cursor-pointer ${open ? `bg-stone-800/70 ${tc.ring}` : "bg-stone-900 ring-stone-800"}`}
                       onClick={() => setExpanded(open ? null : id)}>
-                      <div className="flex items-center gap-3 px-4 py-3">
-                        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${tc.accent}`} />
-                        <div className="flex-1">
+                      <div className="flex items-center gap-3 px-3 py-2.5">
+                        <RoleIcon roleId={id} size={32} className="flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
                           <span className={`text-sm italic ${open ? tc.text : "text-stone-200"}`}>{role.name}</span>
                           {!open && <p className="text-xs text-stone-500 mt-0.5 leading-relaxed line-clamp-1">{role.ability}</p>}
                         </div>
@@ -327,6 +347,7 @@ function Lobby({ game, me, dispatch, onLeave }: any) {
                           }`}>
                             {checked && "✓"}
                           </div>
+                          <RoleIcon roleId={id} size={28} className="flex-shrink-0" />
                           <div className="flex-1 min-w-0">
                             <div className={`text-sm italic ${checked ? tc.text : "text-stone-300"}`}>{role.name}</div>
                             <div className="text-xs text-stone-500 leading-tight mt-0.5 line-clamp-1">{role.ability}</div>
@@ -374,6 +395,7 @@ function Lobby({ game, me, dispatch, onLeave }: any) {
                     }`}>
                       {sel && <div className="w-1.5 h-1.5 rounded-full bg-stone-100" />}
                     </div>
+                    <RoleIcon roleId={role.id} size={28} className="flex-shrink-0" />
                     <div>
                       <div className="text-sm italic">{role.name}</div>
                       <div className="text-xs text-stone-500 line-clamp-1 mt-0.5">{role.ability}</div>
@@ -550,10 +572,15 @@ function StorytellerView({ game, me, dispatch, onLeave }: any) {
                   : isNominee ? "ring-orange-400"
                   : team.ring
                 } ${!p.alive ? "opacity-40 grayscale" : ""}`}>
-                  <div className={`text-[10px] font-bold ${team.text} px-1 text-center leading-tight`}>
+                  <RoleIcon roleId={p.role!} size={46} />
+                  <div className={`text-[8px] font-medium ${team.text} px-1 text-center leading-tight`}>
                     {role.name}{isDrunk ? " 🍺" : ""}
                   </div>
-                  {!p.alive && <Skull className="w-4 h-4 text-stone-700 absolute" />}
+                  {!p.alive && (
+                    <div className="absolute inset-0 rounded-full bg-stone-900/70 flex items-center justify-center">
+                      <Skull className="w-6 h-6 text-stone-500" />
+                    </div>
+                  )}
                   {p.poisoned && p.alive && (
                     <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-purple-800 ring-1 ring-purple-600 flex items-center justify-center">
                       <FlaskConical className="w-2.5 h-2.5 text-purple-200" />
@@ -621,14 +648,19 @@ function StorytellerView({ game, me, dispatch, onLeave }: any) {
                 </button>
               </div>
               <div className="border-t border-stone-700 pt-3 mb-3">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className={`w-2 h-2 rounded-full ${TEAM_COLORS[ROLES[selected.role!].team as Team].accent}`} />
-                  <span className="text-xs uppercase text-stone-300">
-                    {TEAM_COLORS[ROLES[selected.role!].team as Team].label}
-                  </span>
+                <div className="flex items-start gap-3">
+                  <RoleIcon roleId={selected.role!} size={56} className="flex-shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`w-2 h-2 rounded-full ${TEAM_COLORS[ROLES[selected.role!].team as Team].accent}`} />
+                      <span className="text-xs uppercase text-stone-300">
+                        {TEAM_COLORS[ROLES[selected.role!].team as Team].label}
+                      </span>
+                    </div>
+                    <div className={`text-lg italic mb-1 ${TEAM_COLORS[ROLES[selected.role!].team as Team].text}`}>{ROLES[selected.role!].name}</div>
+                    <p className="text-xs text-stone-400 leading-relaxed">{ROLES[selected.role!].ability}</p>
+                  </div>
                 </div>
-                <div className={`text-lg italic mb-1 ${TEAM_COLORS[ROLES[selected.role!].team as Team].text}`}>{ROLES[selected.role!].name}</div>
-                <p className="text-xs text-stone-400 leading-relaxed">{ROLES[selected.role!].ability}</p>
               </div>
               <div className="grid grid-cols-3 gap-2">
                 <button onClick={() => dispatch({ type: "TOGGLE_ALIVE", playerId: selected.id, storytellerId: me.id })}
@@ -702,6 +734,7 @@ function StorytellerView({ game, me, dispatch, onLeave }: any) {
                         <span className={`w-5 h-5 rounded-full ${tc.accent} text-stone-50 text-[10px] font-bold flex items-center justify-center flex-shrink-0`}>
                           {i + 1}
                         </span>
+                        <RoleIcon roleId={player.role!} size={24} className="flex-shrink-0" />
                         <div className="flex-1 min-w-0">
                           <div className={`text-xs font-medium ${tc.text}`}>
                             {realRole.name}{isDrunk ? " 🍺" : ""}
@@ -770,6 +803,9 @@ function PlayerView({ game, me, dispatch, onLeave }: any) {
                   <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-950/60 ring-1 ring-amber-800/40 text-amber-200/80 text-[10px] uppercase tracking-[0.3em]">
                     <span className="w-1 h-1 bg-amber-500/70 rounded-full" />{team.label}
                   </div>
+                </div>
+                <div className="flex justify-center mb-3">
+                  <RoleIcon roleId={displayRoleId!} size={96} />
                 </div>
                 <h2 className="text-5xl mb-4 italic text-amber-100">{myRole.name}</h2>
                 <div className="text-left max-w-md mx-auto bg-stone-950/60 ring-1 ring-stone-700 p-4 mb-4">
