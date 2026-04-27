@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Skull, Crown, Users, LogIn, ScrollText } from "lucide-react";
 import { getScriptList } from "@/data/scripts";
@@ -68,6 +69,16 @@ export default function HomePage() {
               </div>
             </div>
           </button>
+
+          <Link href="/simulator" className="block w-full p-4 bg-amber-950/30 hover:bg-amber-900/30 ring-1 ring-amber-800/40 transition-all">
+            <div className="flex items-center gap-3">
+              <span className="text-xl">🧪</span>
+              <div className="text-left flex-1">
+                <div className="text-amber-200 text-sm tracking-wide">Mode simulation</div>
+                <div className="text-amber-200/50 text-xs">Tester l’app en local (sans serveur)</div>
+              </div>
+            </div>
+          </Link>
         </div>
       )}
 

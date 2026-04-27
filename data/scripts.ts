@@ -97,11 +97,32 @@ export const SCRIPTS: Record<string, Script> = {
   "bad-moon-rising": BAD_MOON_RISING,
 };
 
-export const TEAM_COLORS: Record<Team, { bg: string; ring: string; text: string; label: string; accent: string; dot: string }> = {
-  townsfolk: { bg: "bg-sky-950",    ring: "ring-sky-400",    text: "text-sky-200",    label: "Townsfolk", accent: "bg-sky-600",    dot: "bg-sky-400" },
-  outsider:  { bg: "bg-violet-950", ring: "ring-violet-400", text: "text-violet-200", label: "Outsider",  accent: "bg-violet-600", dot: "bg-violet-400" },
-  minion:    { bg: "bg-orange-950", ring: "ring-orange-400", text: "text-orange-200", label: "Minion",    accent: "bg-orange-600", dot: "bg-orange-400" },
-  demon:     { bg: "bg-red-950",    ring: "ring-red-400",    text: "text-red-200",    label: "Démon",     accent: "bg-red-600",    dot: "bg-red-400" },
+// ─── Palette d'équipes ─────────────────────────────────────────────────
+//
+// Cette palette est partagée par TOUS les usages (cercle Conteur, sidebar
+// nuit, modal de référence, badge sur la vue joueur, sélecteur de rôles
+// dans le lobby, etc.). C'est donc le levier le plus efficace pour
+// homogénéiser le rendu.
+//
+// Choix de design :
+//  - `bg`   est uniformément `bg-stone-900` → de loin (>1m), tous les rôles
+//           se ressemblent. On ne peut PAS deviner bien/mal d'un coup d'œil
+//           sur l'écran d'un voisin.
+//  - `ring` porte la signature subtile (ambre/rouge, opacité modérée). Vue
+//           de près, le Conteur la repère, mais elle ne saute pas aux yeux.
+//  - `text` reste haut-contraste sur fond sombre — les noms de rôles
+//           écrits dans la sidebar nuit (fond `bg-indigo-950/60`) sont
+//           maintenant tous lisibles, contrairement à l'ancien
+//           `text-amber-950` (presque noir sur bleu marine = invisible).
+//  - `accent` garde une teinte forte. Sert aux pastilles numériques de
+//           l'ordre de nuit, aux petits points colorés, etc. — éléments
+//           ponctuels qui aident le Conteur à scanner sans dominer l'UI.
+//
+export const TEAM_COLORS: Record<Team, { bg: string; ring: string; text: string; label: string; accent: string }> = {
+  townsfolk: { bg: "bg-stone-900", ring: "ring-amber-800/50", text: "text-amber-200", label: "Townsfolk", accent: "bg-amber-700" },
+  outsider:  { bg: "bg-stone-900", ring: "ring-amber-600/40", text: "text-amber-100", label: "Outsider",  accent: "bg-amber-500" },
+  minion:    { bg: "bg-stone-900", ring: "ring-red-900/60",   text: "text-red-300",   label: "Minion",    accent: "bg-red-800" },
+  demon:     { bg: "bg-stone-900", ring: "ring-red-700/70",   text: "text-rose-200",  label: "Démon",     accent: "bg-red-700" },
 };
 
 export const getScriptList = () =>

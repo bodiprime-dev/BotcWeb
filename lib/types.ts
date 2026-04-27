@@ -3,9 +3,11 @@ export type Phase = "lobby" | "day" | "night";
 export interface Player {
   id: string;
   name: string;
-  role: string | null;   // null en lobby
+  role: string | null;          // vrai rôle (peut être "drunk")
+  displayRole: string | null;   // rôle affiché côté joueur — = role sauf Drunk où c'est le rôle fictif
   alive: boolean;
   isStoryteller: boolean;
+  poisoned: boolean;
 }
 
 export interface GameState {
@@ -17,11 +19,11 @@ export interface GameState {
   storytellerId: string | null;
   createdAt: number;
   startedAt: number | null;
+  selectedRoleIds: string[];
   nominee: string | null;
-  votes: Record<string, string[]>; // playerId -> [voterIds]
+  votes: Record<string, string[]>;
 }
 
-// Ce que reçoit un joueur (rôle des autres = caché)
 export interface PlayerView {
   code: string;
   scriptId: string;
@@ -36,8 +38,10 @@ export interface PlayerView {
 export type GameAction =
   | { type: "ADD_PLAYER"; name: string }
   | { type: "REMOVE_PLAYER"; playerId: string }
-  | { type: "START_GAME"; storytellerId: string }
+  | { type: "START_GAME"; storytellerId: string; selectedRoleIds: string[]; drunkFakeRoleId?: string | null }
   | { type: "TOGGLE_ALIVE"; playerId: string; storytellerId: string }
+  | { type: "TOGGLE_POISON"; playerId: string; storytellerId: string }
+  | { type: "SET_NOMINEE"; playerId: string | null; storytellerId: string }
   | { type: "TOGGLE_PHASE"; storytellerId: string }
   | { type: "NOMINATE"; nominatorId: string; nomineeId: string }
   | { type: "CLEAR_NOMINATION"; storytellerId: string };
