@@ -15,7 +15,7 @@ function RoleIcon({ roleId, size = 40, className = "" }: { roleId: string; size?
       {state !== "failed" && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={`https://raw.githubusercontent.com/bra1n/townsquare/develop/src/roles/${roleId}.png`}
+          src={`https://raw.githubusercontent.com/bra1n/townsquare/main/src/assets/icons/${roleId}.png`}
           alt=""
           width={size}
           height={size}
