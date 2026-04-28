@@ -2,6 +2,21 @@ import { nanoid } from "nanoid";
 import type { GameState, GameAction, Player, PlayerView } from "./types";
 import { SCRIPTS } from "@/data/scripts";
 
+// Répartition officielle Blood on the Clocktower par nombre de joueurs
+const ROLE_DISTRIBUTION: Record<number, { townsfolk: number; outsiders: number; minions: number; demons: number }> = {
+   5: { townsfolk: 3, outsiders: 0, minions: 1, demons: 1 },
+   6: { townsfolk: 4, outsiders: 0, minions: 1, demons: 1 },
+   7: { townsfolk: 5, outsiders: 0, minions: 1, demons: 1 },
+   8: { townsfolk: 5, outsiders: 1, minions: 1, demons: 1 },
+   9: { townsfolk: 5, outsiders: 2, minions: 1, demons: 1 },
+  10: { townsfolk: 7, outsiders: 0, minions: 2, demons: 1 },
+  11: { townsfolk: 7, outsiders: 1, minions: 2, demons: 1 },
+  12: { townsfolk: 7, outsiders: 2, minions: 2, demons: 1 },
+  13: { townsfolk: 9, outsiders: 0, minions: 3, demons: 1 },
+  14: { townsfolk: 9, outsiders: 1, minions: 3, demons: 1 },
+  15: { townsfolk: 9, outsiders: 2, minions: 3, demons: 1 },
+};
+
 export function createNewGame(scriptId: string): GameState {
   const code = generateCode();
   return {
@@ -60,14 +75,27 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       const playablePlayers = state.players.filter(p => p.id !== action.storytellerId);
       const playerCount = playablePlayers.length;
 
-      // Pool de rôles : sélection si suffisante, sinon tirage au sort dans tout le script
-      const pool = action.selectedRoleIds.length >= playerCount
-        ? action.selectedRoleIds
-        : Object.keys(script.roles);
+      const shuffle = <T>(arr: T[]): T[] => [...arr].sort(() => Math.random() - 0.5);
 
-      const assignedRoles = [...pool]
-        .sort(() => Math.random() - 0.5)
-        .slice(0, playerCount);
+      let assignedRoles: string[];
+
+      if (action.selectedRoleIds.length >= playerCount) {
+        // Sélection manuelle : on utilise les rôles choisis, mélangés
+        assignedRoles = shuffle(action.selectedRoleIds).slice(0, playerCount);
+      } else {
+        // Mode aléatoire : respect des règles officielles de répartition
+        const dist = ROLE_DISTRIBUTION[playerCount] ?? ROLE_DISTRIBUTION[15];
+        const byTeam: Record<string, string[]> = { townsfolk: [], outsider: [], minion: [], demon: [] };
+        for (const [id, role] of Object.entries(script.roles)) {
+          byTeam[role.team]?.push(id);
+        }
+        assignedRoles = shuffle([
+          ...shuffle(byTeam.townsfolk).slice(0, dist.townsfolk),
+          ...shuffle(byTeam.outsider).slice(0, dist.outsiders),
+          ...shuffle(byTeam.minion).slice(0, dist.minions),
+          ...shuffle(byTeam.demon).slice(0, dist.demons),
+        ]);
+      }
 
       let roleIdx = 0;
       const players = state.players.map((p) => {
