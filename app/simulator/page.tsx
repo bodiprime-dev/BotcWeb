@@ -53,15 +53,7 @@ export default function SimulatorPage() {
   const [prefillRoleInfo, setPrefillRoleInfo] = useState(false);
 
   const dispatch = (action: GameAction) =>
-    setGame(prev => {
-      if (!prev) return prev;
-      let next = applyAction(prev, action);
-      // Si le pré-remplissage est désactivé, on efface les infos générées au lancement
-      if (action.type === "START_GAME" && !prefillRoleInfo) {
-        next = { ...next, players: next.players.map(p => ({ ...p, roleInfo: [] })) };
-      }
-      return next;
-    });
+    setGame(prev => prev ? applyAction(prev, action) : prev);
 
   const startNewSimulation = () => {
     let g = createNewGame(scriptId);
@@ -175,7 +167,7 @@ export default function SimulatorPage() {
 
       <div className="pt-2">
         {game.phase === "lobby" ? (
-          <SimLobby game={game} me={me} dispatch={dispatch} />
+          <SimLobby game={game} me={me} dispatch={dispatch} prefillRoleInfo={prefillRoleInfo} />
         ) : isGmView ? (
           <SimStorytellerView game={game} me={me} dispatch={dispatch} />
         ) : (
@@ -289,7 +281,7 @@ function ScriptReference({ scriptId, onClose }: any) {
   );
 }
 
-function SimLobby({ game, me, dispatch }: any) {
+function SimLobby({ game, me, dispatch, prefillRoleInfo }: any) {
   const script = SCRIPTS[game.scriptId];
   const isStoryteller = game.players[0]?.id === me.id;
   const playableCount = game.players.length - 1;
@@ -313,6 +305,7 @@ function SimLobby({ game, me, dispatch }: any) {
       selectedRoleIds: roleIds,
       drunkFakeRoleId: fakeRoleId,
       demonBluffRoleIds: bluffIds.length === 3 ? [bluffIds[0], bluffIds[1], bluffIds[2]] : null,
+      prefillRoleInfo,
     });
   };
 

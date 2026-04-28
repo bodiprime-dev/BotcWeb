@@ -240,6 +240,7 @@ function Lobby({ game, me, dispatch, onLeave }: any) {
   const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
   const [drunkFakeRoleId, setDrunkFakeRoleId] = useState<string | null>(null);
   const [demonBluffRoleIds, setDemonBluffRoleIds] = useState<string[]>([]);
+  const [prefillRoleInfo, setPrefillRoleInfo] = useState(false);
 
   const needed = playableCount;
   const selectedCount = selectedRoleIds.length;
@@ -263,6 +264,7 @@ function Lobby({ game, me, dispatch, onLeave }: any) {
       selectedRoleIds: roleIds,
       drunkFakeRoleId: fakeRoleId,
       demonBluffRoleIds: bluffIds.length === 3 ? [bluffIds[0], bluffIds[1], bluffIds[2]] : null,
+      prefillRoleInfo,
     });
   };
 
@@ -328,6 +330,26 @@ function Lobby({ game, me, dispatch, onLeave }: any) {
             <div className="bg-amber-950/30 ring-1 ring-amber-800/40 p-3 mb-4 text-xs text-amber-200/80 leading-relaxed rounded">
               <span className="text-amber-400 font-medium">👑 Tu es le Game Master.</span> Tu ne joues pas — tu gères la partie. {needed} rôles seront distribués aux autres joueurs.
             </div>
+            <button
+              onClick={() => setPrefillRoleInfo(v => !v)}
+              className={`w-full flex items-center gap-3 p-3 mb-4 ring-1 text-left transition-all ${
+                prefillRoleInfo
+                  ? "bg-stone-800 ring-indigo-700/60 text-indigo-200"
+                  : "bg-stone-900 ring-stone-700 text-stone-400 hover:ring-stone-600"
+              }`}
+            >
+              <div className={`w-4 h-4 flex-shrink-0 border-2 flex items-center justify-center transition-all ${
+                prefillRoleInfo ? "bg-indigo-700 border-indigo-600" : "border-stone-600"
+              }`}>
+                {prefillRoleInfo && <span className="text-[10px] font-bold text-white leading-none">✓</span>}
+              </div>
+              <div>
+                <div className="text-sm">Pré-remplir les infos de rôle</div>
+                <div className="text-xs text-stone-500 mt-0.5">
+                  Génère automatiquement bluffs, lavandière, grand-mère… au lancement
+                </div>
+              </div>
+            </button>
             <button onClick={() => setStep("roles")}
               className="w-full p-4 bg-stone-800 hover:bg-stone-700 text-stone-100 ring-1 ring-stone-600 tracking-[0.2em] uppercase text-sm mb-3 flex items-center justify-center gap-2">
               <BookOpen className="w-4 h-4" /> Configurer les rôles

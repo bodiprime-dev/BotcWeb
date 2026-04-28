@@ -60,7 +60,7 @@ export interface PlayerView {
 export type GameAction =
   | { type: "ADD_PLAYER"; name: string }
   | { type: "REMOVE_PLAYER"; playerId: string }
-  | { type: "START_GAME"; storytellerId: string; selectedRoleIds: string[]; drunkFakeRoleId?: string | null; demonBluffRoleIds?: [string, string, string] | null }
+  | { type: "START_GAME"; storytellerId: string; selectedRoleIds: string[]; drunkFakeRoleId?: string | null; demonBluffRoleIds?: [string, string, string] | null; prefillRoleInfo?: boolean }
   | { type: "TOGGLE_ALIVE"; playerId: string; storytellerId: string }
   | { type: "TOGGLE_POISON"; playerId: string; storytellerId: string }
   | { type: "SET_NOMINEE"; playerId: string | null; storytellerId: string }

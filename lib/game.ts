@@ -223,11 +223,14 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       });
 
       // Passe 2 : calculer les infos de rôle (nécessite de connaître tous les rôles assignés)
+      // Ignorée si prefillRoleInfo est explicitement false (GM a décoché l'option)
       const demonBluffs = pickDemonBluffs(script, assignedRoles, action.demonBluffRoleIds);
-      const players = playersWithRoles.map((p) => {
-        if (p.isStoryteller || !p.role) return p;
-        return { ...p, roleInfo: buildRoleInfo(p.role, playersWithRoles, script, demonBluffs) };
-      });
+      const players = action.prefillRoleInfo === false
+        ? playersWithRoles
+        : playersWithRoles.map((p) => {
+            if (p.isStoryteller || !p.role) return p;
+            return { ...p, roleInfo: buildRoleInfo(p.role, playersWithRoles, script, demonBluffs) };
+          });
 
       return {
         ...state,
