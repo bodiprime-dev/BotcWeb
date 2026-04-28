@@ -1,6 +1,6 @@
 import { nanoid } from "nanoid";
-import type { GameState, GameAction, Player, PlayerView } from "./types";
-import { SCRIPTS } from "@/data/scripts";
+import type { GameState, GameAction, Player, PlayerView, RoleInfoEntry } from "./types";
+import { SCRIPTS, type Script } from "@/data/scripts";
 
 // Répartition officielle Blood on the Clocktower par nombre de joueurs
 const ROLE_DISTRIBUTION: Record<number, { townsfolk: number; outsiders: number; minions: number; demons: number }> = {
@@ -41,6 +41,116 @@ export function generateCode(): string {
   return s;
 }
 
+// ─── Helpers RoleInfo ──────────────────────────────────────────────────────
+
+function pickDemonBluffs(
+  script: Script,
+  assignedRoles: string[],
+  provided?: [string, string, string] | null
+): [string, string, string] | null {
+  if (provided && provided.length === 3) return provided;
+  const inPlay = new Set(assignedRoles);
+  const candidates = Object.entries(script.roles)
+    .filter(([id, r]) => r.team === "townsfolk" && !inPlay.has(id))
+    .map(([id]) => id)
+    .sort(() => Math.random() - 0.5);
+  if (candidates.length < 3) return null;
+  return [candidates[0], candidates[1], candidates[2]];
+}
+
+function buildRoleInfo(
+  roleId: string,
+  allPlayers: Player[],
+  script: Script,
+  demonBluffs: [string, string, string] | null
+): RoleInfoEntry[] {
+  const shuffle = <T>(arr: T[]): T[] => [...arr].sort(() => Math.random() - 0.5);
+
+  const nonSt = allPlayers.filter(p => !p.isStoryteller && p.role);
+
+  switch (roleId) {
+    // ─── Démons : reçoivent les bluffs ──────────────────────────────
+    case "imp":
+    case "pukka":
+    case "zombuul":
+    case "shabaloth":
+    case "po": {
+      if (!demonBluffs) return [];
+      return [{ kind: "bluffs", roleIds: demonBluffs }];
+    }
+
+    // ─── Lavandière : 1 joueur townsfolk parmi 2 ────────────────────
+    case "washerwoman": {
+      const trueOnes = shuffle(nonSt.filter(p => script.roles[p.role!]?.team === "townsfolk"));
+      if (trueOnes.length < 1) return [];
+      const truePlayer = trueOnes[0];
+      const decoys = shuffle(nonSt.filter(p => p.id !== truePlayer.id));
+      if (decoys.length < 1) return [];
+      const [a, b] = shuffle([truePlayer, decoys[0]]);
+      return [{ kind: "two_players_one_role", playerAId: a.id, playerBId: b.id, roleId: truePlayer.role! }];
+    }
+
+    // ─── Bibliothécaire : 1 joueur outsider parmi 2 (ou aucun) ─────
+    case "librarian": {
+      const trueOnes = shuffle(nonSt.filter(p => script.roles[p.role!]?.team === "outsider"));
+      if (trueOnes.length === 0) return [{ kind: "text", content: "Aucun Outsider n'est en jeu." }];
+      const truePlayer = trueOnes[0];
+      const decoys = shuffle(nonSt.filter(p => p.id !== truePlayer.id));
+      if (decoys.length < 1) return [];
+      const [a, b] = shuffle([truePlayer, decoys[0]]);
+      return [{ kind: "two_players_one_role", playerAId: a.id, playerBId: b.id, roleId: truePlayer.role! }];
+    }
+
+    // ─── Enquêteur : 1 joueur minion parmi 2 ────────────────────────
+    case "investigator": {
+      const trueOnes = shuffle(nonSt.filter(p => script.roles[p.role!]?.team === "minion"));
+      if (trueOnes.length < 1) return [];
+      const truePlayer = trueOnes[0];
+      const decoys = shuffle(nonSt.filter(p => p.id !== truePlayer.id));
+      if (decoys.length < 1) return [];
+      const [a, b] = shuffle([truePlayer, decoys[0]]);
+      return [{ kind: "two_players_one_role", playerAId: a.id, playerBId: b.id, roleId: truePlayer.role! }];
+    }
+
+    // ─── Chef / Empath : nécessite l'ordre des sièges → GM remplit ──
+    case "chef":
+      return [{ kind: "count", label: "Paires maléfiques voisines", value: 0 }];
+
+    case "empath":
+      return [{ kind: "count", label: "Voisins maléfiques", value: 0 }];
+
+    // ─── Grand-mère : 1 joueur bon + son rôle ───────────────────────
+    case "grandmother": {
+      const goodOnes = shuffle(nonSt.filter(p =>
+        script.roles[p.role!]?.team === "townsfolk" ||
+        script.roles[p.role!]?.team === "outsider"
+      ));
+      if (goodOnes.length < 1) return [];
+      const chosen = goodOnes[0];
+      return [{ kind: "player_and_role", playerId: chosen.id, roleId: chosen.role! }];
+    }
+
+    // ─── Parrain : outsiders en jeu ──────────────────────────────────
+    case "godfather": {
+      const outsiderIds = nonSt
+        .filter(p => script.roles[p.role!]?.team === "outsider")
+        .map(p => p.role!);
+      return [{ kind: "role_list", roleIds: outsiderIds }];
+    }
+
+    // ─── Lunatique : reçoit les mêmes bluffs que le démon ───────────
+    case "lunatic": {
+      if (!demonBluffs) return [];
+      return [{ kind: "bluffs", roleIds: demonBluffs }];
+    }
+
+    default:
+      return [];
+  }
+}
+
+// ─── Reducer ───────────────────────────────────────────────────────────────
+
 export function applyAction(state: GameState, action: GameAction): GameState {
   switch (action.type) {
     case "ADD_PLAYER": {
@@ -56,6 +166,7 @@ export function applyAction(state: GameState, action: GameAction): GameState {
         alive: true,
         isStoryteller: false,
         poisoned: false,
+        roleInfo: [],
       };
       return { ...state, players: [...state.players, player] };
     }
@@ -71,7 +182,6 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       const script = SCRIPTS[state.scriptId];
       if (!script) return state;
 
-      // Le GM ne joue pas — on assigne des rôles uniquement aux non-storyteller
       const playablePlayers = state.players.filter(p => p.id !== action.storytellerId);
       const playerCount = playablePlayers.length;
 
@@ -80,10 +190,8 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       let assignedRoles: string[];
 
       if (action.selectedRoleIds.length >= playerCount) {
-        // Sélection manuelle : on utilise les rôles choisis, mélangés
         assignedRoles = shuffle(action.selectedRoleIds).slice(0, playerCount);
       } else {
-        // Mode aléatoire : respect des règles officielles de répartition
         const dist = ROLE_DISTRIBUTION[playerCount] ?? ROLE_DISTRIBUTION[15];
         const byTeam: Record<string, string[]> = { townsfolk: [], outsider: [], minion: [], demon: [] };
         for (const [id, role] of Object.entries(script.roles)) {
@@ -97,11 +205,11 @@ export function applyAction(state: GameState, action: GameAction): GameState {
         ]);
       }
 
+      // Passe 1 : assigner les rôles (sans roleInfo encore)
       let roleIdx = 0;
-      const players = state.players.map((p) => {
+      const playersWithRoles: Player[] = state.players.map((p) => {
         if (p.id === action.storytellerId) {
-          // GM = pas de rôle
-          return { ...p, role: null, displayRole: null, isStoryteller: true };
+          return { ...p, role: null, displayRole: null, isStoryteller: true, roleInfo: [] };
         }
         const realRole = assignedRoles[roleIdx++];
         const isDrunk = realRole === "drunk";
@@ -110,7 +218,15 @@ export function applyAction(state: GameState, action: GameAction): GameState {
           role: realRole,
           displayRole: isDrunk && action.drunkFakeRoleId ? action.drunkFakeRoleId : realRole,
           isStoryteller: false,
+          roleInfo: [],
         };
+      });
+
+      // Passe 2 : calculer les infos de rôle (nécessite de connaître tous les rôles assignés)
+      const demonBluffs = pickDemonBluffs(script, assignedRoles, action.demonBluffRoleIds);
+      const players = playersWithRoles.map((p) => {
+        if (p.isStoryteller || !p.role) return p;
+        return { ...p, roleInfo: buildRoleInfo(p.role, playersWithRoles, script, demonBluffs) };
       });
 
       return {
@@ -164,7 +280,6 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       const nominator = state.players.find(p => p.id === action.nominatorId);
       const nominee = state.players.find(p => p.id === action.nomineeId);
       if (!nominator || !nominee || !nominator.alive || !nominee.alive) return state;
-      // Le GM ne peut pas nominer
       if (nominator.isStoryteller) return state;
       return { ...state, nominee: action.nomineeId, votes: {} };
     }
@@ -174,6 +289,17 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       return { ...state, nominee: null, votes: {} };
     }
 
+    case "SET_ROLE_INFO": {
+      if (action.storytellerId !== state.storytellerId) return state;
+      if (state.phase === "lobby") return state;
+      return {
+        ...state,
+        players: state.players.map(p =>
+          p.id === action.playerId ? { ...p, roleInfo: action.roleInfo } : p
+        ),
+      };
+    }
+
     default:
       return state;
   }
@@ -181,18 +307,17 @@ export function applyAction(state: GameState, action: GameAction): GameState {
 
 // Vue restreinte côté joueur :
 // - le joueur voit son displayRole (rôle fictif si Drunk)
-// - les autres joueurs apparaissent SANS rôle (sauf pour le GM qui voit tout)
+// - les autres joueurs apparaissent SANS rôle ni roleInfo (sauf pour le GM qui voit tout)
 export function getPlayerView(state: GameState, playerId: string): PlayerView | null {
   const me = state.players.find(p => p.id === playerId);
   if (!me) return null;
 
-  // Côté GM : on lui donne le vrai rôle des autres dans `role`
-  // Côté joueur normal : `role` = null (privé)
   const others = state.players
     .filter(p => p.id !== playerId)
     .map(p => ({
       ...p,
       role: me.isStoryteller ? p.role : null,
+      roleInfo: me.isStoryteller ? p.roleInfo : [] as [],
     })) as PlayerView["others"];
 
   return {
