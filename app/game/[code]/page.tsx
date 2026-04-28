@@ -876,6 +876,14 @@ function StorytellerView({ game, me, dispatch, onLeave }: any) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showScript, setShowScript] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [vw, setVw] = useState(800);
+  const [vh, setVh] = useState(600);
+  useEffect(() => {
+    const update = () => { setVw(window.innerWidth); setVh(window.innerHeight); };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
   const script = SCRIPTS[game.scriptId];
   const ROLES = script.roles;
   const selected = game.players.find((p: any) => p.id === selectedId);
@@ -908,13 +916,13 @@ function StorytellerView({ game, me, dispatch, onLeave }: any) {
     if (game.phase === "night") setPanelOpen(true);
   }, [game.phase]);
 
-  // Rayon du cercle adaptatif. Formule : un palier de base qui dépend du
-  // nombre de joueurs, plafonné par un max qui dépend de l'état du drawer.
-  // Drawer fermé → on peut viser plus large car toute la largeur est dispo.
-  const radius = panelOpen
-    ? Math.max(80, Math.min(170, playablePlayers.length * 12))
-    : Math.max(100, Math.min(220, playablePlayers.length * 14));
-  const center = radius + 60;
+  const availW = panelOpen ? Math.max(vw - 360, 200) : vw - 32;
+  const availH = vh - 200;
+  const screenMax = Math.min(availW, availH) * 0.42;
+  const radius = Math.max(90, Math.min(playablePlayers.length * 16, screenMax));
+  const iconBox = Math.max(60, Math.min(88, Math.round(radius * 0.42 + 22)));
+  const iconSize = Math.round(iconBox * 0.65);
+  const center = radius + iconBox / 2 + 24;
   const size = center * 2;
 
   const closePanel = () => {
@@ -971,15 +979,16 @@ function StorytellerView({ game, me, dispatch, onLeave }: any) {
           </div>
         </div>
         <div className="relative" style={{ width: size, height: size, maxWidth: "100%" }}>
-          <div className="absolute inset-12 rounded-full ring-1 ring-stone-700/40" />
-          <div className="absolute inset-20 rounded-full ring-1 ring-stone-800/40" />
+          <div className="absolute rounded-full ring-1 ring-stone-700/40" style={{ inset: Math.round(size * 0.1) }} />
+          <div className="absolute rounded-full ring-1 ring-stone-800/40" style={{ inset: Math.round(size * 0.18) }} />
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <Skull className="w-10 h-10 text-stone-700" strokeWidth={1.2} />
           </div>
           {playablePlayers.map((p: any, i: number) => {
             const angle = (i / playablePlayers.length) * 2 * Math.PI - Math.PI / 2;
-            const x = center + radius * Math.cos(angle) - 36;
-            const y = center + radius * Math.sin(angle) - 36;
+            const half = iconBox / 2;
+            const x = center + radius * Math.cos(angle) - half;
+            const y = center + radius * Math.sin(angle) - half;
             const role = ROLES[p.role!];
             const team = TEAM_COLORS[role.team as Team];
             const isNominee = game.nominee === p.id;
@@ -987,12 +996,12 @@ function StorytellerView({ game, me, dispatch, onLeave }: any) {
             return (
               <button key={p.id} onClick={() => setSelectedId(p.id === selectedId ? null : p.id)}
                 className="absolute" style={{ left: x, top: y }}>
-                <div className={`w-[72px] h-[72px] rounded-full ${team.bg} ring-2 flex flex-col items-center justify-center transition-all relative ${
+                <div className={`rounded-full ${team.bg} ring-2 flex flex-col items-center justify-center transition-all relative ${
                   selectedId === p.id ? "scale-110 ring-amber-400"
                   : isNominee ? "ring-orange-400"
                   : team.ring
-                } ${!p.alive ? "opacity-40 grayscale" : ""}`}>
-                  <RoleIcon roleId={p.role!} size={46} />
+                } ${!p.alive ? "opacity-40 grayscale" : ""}`} style={{ width: iconBox, height: iconBox }}>
+                  <RoleIcon roleId={p.role!} size={iconSize} />
                   <div className={`text-[8px] font-medium ${team.text} px-1 text-center leading-tight`}>
                     {role.name}{isDrunk ? " 🍺" : ""}
                   </div>

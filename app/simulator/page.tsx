@@ -951,12 +951,27 @@ function SimStorytellerView({ game, me, dispatch }: any) {
   // Ouverture auto en phase nuit (utile pour voir l'ordre nocturne)
   useEffect(() => { if (game.phase === "night") setPanelOpen(true); }, [game.phase]);
 
-  // Rayon adaptatif : croissance basée sur le nombre de joueurs, plafond
-  // qui dépend de l'état du drawer (drawer fermé → plus de place dispo).
-  const radius = panelOpen
-    ? Math.max(80, Math.min(170, playable.length * 12))
-    : Math.max(100, Math.min(220, playable.length * 14));
-  const center = radius + 60;
+  // Dimensions de la fenêtre pour un cercle proportionnel à l'écran
+  const [vw, setVw] = useState(800);
+  const [vh, setVh] = useState(600);
+  useEffect(() => {
+    const update = () => { setVw(window.innerWidth); setVh(window.innerHeight); };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+
+  // Rayon : occupe jusqu'à ~42 % du côté disponible le plus court,
+  // tout en respectant l'espacement minimal entre icônes (n × 16 px).
+  const availW = panelOpen ? Math.max(vw - 360, 200) : vw - 32;
+  const availH = vh - 200;
+  const screenMax = Math.min(availW, availH) * 0.42;
+  const radius = Math.max(90, Math.min(playable.length * 16, screenMax));
+
+  // Taille des icônes proportionnelle au rayon
+  const iconBox = Math.max(60, Math.min(88, Math.round(radius * 0.42 + 22)));
+  const iconSize = Math.round(iconBox * 0.65);
+  const center = radius + iconBox / 2 + 24;
   const size = center * 2;
 
   const closePanel = () => { setSelectedId(null); setPanelOpen(false); };
@@ -1001,15 +1016,16 @@ function SimStorytellerView({ game, me, dispatch }: any) {
           </div>
         </div>
         <div className="relative" style={{ width: size, height: size, maxWidth: "100%" }}>
-          <div className="absolute inset-12 rounded-full ring-1 ring-stone-700/40" />
-          <div className="absolute inset-20 rounded-full ring-1 ring-stone-800/40" />
+          <div className="absolute rounded-full ring-1 ring-stone-700/40" style={{ inset: Math.round(size * 0.1) }} />
+          <div className="absolute rounded-full ring-1 ring-stone-800/40" style={{ inset: Math.round(size * 0.18) }} />
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <Skull className="w-10 h-10 text-stone-700" strokeWidth={1.2} />
           </div>
           {playable.map((p: any, i: number) => {
             const angle = (i / playable.length) * 2 * Math.PI - Math.PI / 2;
-            const x = center + radius * Math.cos(angle) - 36;
-            const y = center + radius * Math.sin(angle) - 36;
+            const half = iconBox / 2;
+            const x = center + radius * Math.cos(angle) - half;
+            const y = center + radius * Math.sin(angle) - half;
             const role = ROLES[p.role!];
             const team = TEAM_COLORS[role.team as Team];
             const isNominee = game.nominee === p.id;
@@ -1017,10 +1033,12 @@ function SimStorytellerView({ game, me, dispatch }: any) {
             return (
               <button key={p.id} onClick={() => setSelectedId(p.id === selectedId ? null : p.id)}
                 className="absolute" style={{ left: x, top: y }}>
-                <div className={`w-[72px] h-[72px] rounded-full ${team.bg} ring-2 flex flex-col items-center justify-center transition-all relative ${
-                  selectedId === p.id ? "scale-110 ring-amber-400" : isNominee ? "ring-orange-400" : team.ring
-                } ${!p.alive ? "opacity-40 grayscale" : ""}`}>
-                  <RoleIcon roleId={p.role!} size={46} />
+                <div
+                  style={{ width: iconBox, height: iconBox }}
+                  className={`rounded-full ${team.bg} ring-2 flex flex-col items-center justify-center transition-all relative ${
+                    selectedId === p.id ? "scale-110 ring-amber-400" : isNominee ? "ring-orange-400" : team.ring
+                  } ${!p.alive ? "opacity-40 grayscale" : ""}`}>
+                  <RoleIcon roleId={p.role!} size={iconSize} />
                   <div className={`text-[8px] font-medium ${team.text} px-1 text-center leading-tight`}>
                     {role.name}{isDrunk ? " 🍺" : ""}
                   </div>
