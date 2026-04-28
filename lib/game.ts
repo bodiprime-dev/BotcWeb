@@ -58,11 +58,36 @@ function pickDemonBluffs(
   return [candidates[0], candidates[1], candidates[2]];
 }
 
+// Picks 3 bluff roles for the Lunatic — different from the demon's bluffs
+function pickLunaticBluffs(
+  script: Script,
+  assignedRoles: string[],
+  demonBluffs: [string, string, string] | null,
+  provided?: [string, string, string] | null
+): [string, string, string] | null {
+  if (provided && provided.length === 3) return provided;
+  const excluded = new Set([...assignedRoles, ...(demonBluffs ?? [])]);
+  const candidates = Object.entries(script.roles)
+    .filter(([id, r]) => r.team === "townsfolk" && !excluded.has(id))
+    .map(([id]) => id)
+    .sort(() => Math.random() - 0.5);
+  if (candidates.length >= 3) return [candidates[0], candidates[1], candidates[2]];
+  // Fallback: relax constraint (allow overlap with demonBluffs)
+  const inPlay = new Set(assignedRoles);
+  const fallback = Object.entries(script.roles)
+    .filter(([id, r]) => r.team === "townsfolk" && !inPlay.has(id))
+    .map(([id]) => id)
+    .sort(() => Math.random() - 0.5);
+  if (fallback.length < 3) return null;
+  return [fallback[0], fallback[1], fallback[2]];
+}
+
 function buildRoleInfo(
   roleId: string,
   allPlayers: Player[],
   script: Script,
-  demonBluffs: [string, string, string] | null
+  demonBluffs: [string, string, string] | null,
+  lunaticBluffs: [string, string, string] | null
 ): RoleInfoEntry[] {
   const shuffle = <T>(arr: T[]): T[] => [...arr].sort(() => Math.random() - 0.5);
 
@@ -138,20 +163,15 @@ function buildRoleInfo(
       return [{ kind: "role_list", roleIds: outsiderIds }];
     }
 
-    // ─── Lunatique : reçoit les mêmes bluffs que le démon ───────────
+    // ─── Lunatique : reçoit ses propres bluffs (différents du démon) ──
     case "lunatic": {
-      if (!demonBluffs) return [];
-      return [{ kind: "bluffs", roleIds: demonBluffs }];
+      if (!lunaticBluffs) return [];
+      return [{ kind: "bluffs", roleIds: lunaticBluffs }];
     }
 
-    // ─── Devin : red herring (1ère nuit) ──────────────────────────────
+    // ─── Devin : pas d'info initiale, c'est au joueur de choisir 2 cibles chaque nuit ──
     case "fortuneteller": {
-      const goodOnes = shuffle(nonSt.filter(p =>
-        script.roles[p.role!]?.team === "townsfolk" ||
-        script.roles[p.role!]?.team === "outsider"
-      ));
-      if (goodOnes.length < 1) return [];
-      return [{ kind: "player_and_role", playerId: goodOnes[0].id, roleId: "fortuneteller", label: "Red Herring" }];
+      return [];
     }
 
     default:
@@ -240,6 +260,7 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       // Passe 2 : calculer les infos de rôle (nécessite de connaître tous les rôles assignés)
       // Ignorée si prefillRoleInfo est explicitement false (GM a décoché l'option)
       const demonBluffs = pickDemonBluffs(script, assignedRoles, action.demonBluffRoleIds);
+      const lunaticBluffs = pickLunaticBluffs(script, assignedRoles, demonBluffs, action.lunaticBluffRoleIds);
       const players = action.prefillRoleInfo === false
         ? playersWithRoles
         : playersWithRoles.map((p) => {
@@ -251,9 +272,9 @@ export function applyAction(state: GameState, action: GameAction): GameState {
               const rotated = [roles[roles.length - 1], ...roles.slice(0, -1)];
               const falsePlayers = nonSt.map((q, i) => ({ ...q, role: rotated[i], displayRole: rotated[i] }));
               const infoPlayers = playersWithRoles.map(q => falsePlayers.find(f => f.id === q.id) ?? q);
-              return { ...p, roleInfo: buildRoleInfo(p.displayRole, infoPlayers, script, demonBluffs) };
+              return { ...p, roleInfo: buildRoleInfo(p.displayRole, infoPlayers, script, demonBluffs, lunaticBluffs) };
             }
-            return { ...p, roleInfo: buildRoleInfo(p.role, playersWithRoles, script, demonBluffs) };
+            return { ...p, roleInfo: buildRoleInfo(p.role, playersWithRoles, script, demonBluffs, lunaticBluffs) };
           });
 
       return {

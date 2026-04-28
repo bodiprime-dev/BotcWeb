@@ -287,10 +287,11 @@ function SimLobby({ game, me, dispatch, prefillRoleInfo }: any) {
   const playableCount = game.players.length - 1;
   const canStart = playableCount >= 5 && isStoryteller;
 
-  const [step, setStep] = useState<"players" | "roles" | "drunk" | "lunatic" | "bluffs">("players");
+  const [step, setStep] = useState<"players" | "roles" | "drunk" | "lunatic" | "lunatic-bluffs" | "bluffs">("players");
   const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
   const [drunkFakeRoleId, setDrunkFakeRoleId] = useState<string | null>(null);
   const [lunaticFakeDemonId, setLunaticFakeDemonId] = useState<string | null>(null);
+  const [lunaticBluffRoleIds, setLunaticBluffRoleIds] = useState<string[]>([]);
   const [demonBluffRoleIds, setDemonBluffRoleIds] = useState<string[]>([]);
   const [newName, setNewName] = useState("");
 
@@ -299,13 +300,14 @@ function SimLobby({ game, me, dispatch, prefillRoleInfo }: any) {
   const hasDemonInRoles = (roleIds: string[]) =>
     roleIds.some(id => script.roles[id]?.team === "demon");
 
-  const launchGame = (roleIds: string[], fakeRoleId: string | null, lunaticDemonId: string | null, bluffIds: string[]) => {
+  const launchGame = (roleIds: string[], fakeRoleId: string | null, lunaticDemonId: string | null, lunaticBluffIds: string[], bluffIds: string[]) => {
     dispatch({
       type: "START_GAME",
       storytellerId: game.players[0].id,
       selectedRoleIds: roleIds,
       drunkFakeRoleId: fakeRoleId,
       lunaticFakeDemonId: lunaticDemonId,
+      lunaticBluffRoleIds: lunaticBluffIds.length === 3 ? [lunaticBluffIds[0], lunaticBluffIds[1], lunaticBluffIds[2]] : null,
       demonBluffRoleIds: bluffIds.length === 3 ? [bluffIds[0], bluffIds[1], bluffIds[2]] : null,
       prefillRoleInfo,
     });
@@ -318,9 +320,9 @@ function SimLobby({ game, me, dispatch, prefillRoleInfo }: any) {
       );
       if (opts.length > 0) { setStep("drunk"); return; }
     }
-    if (roleIds.includes("lunatic") && hasDemonInRoles(roleIds)) { setStep("lunatic"); return; }
+    if (roleIds.includes("lunatic")) { setStep("lunatic"); return; }
     if (hasDemonInRoles(roleIds)) { setStep("bluffs"); return; }
-    launchGame(roleIds, null, null, []);
+    launchGame(roleIds, null, null, [], []);
   };
 
   const fakeRoleOptions = Object.entries(script.roles)
@@ -488,66 +490,129 @@ function SimLobby({ game, me, dispatch, prefillRoleInfo }: any) {
               className="flex-1 p-3 bg-stone-900 ring-1 ring-stone-700 text-stone-400 text-sm">← Retour</button>
             <button
               onClick={() => {
-                if (selectedRoleIds.includes("lunatic") && hasDemonInRoles(selectedRoleIds)) { setStep("lunatic"); }
+                if (selectedRoleIds.includes("lunatic")) { setStep("lunatic"); }
                 else if (hasDemonInRoles(selectedRoleIds)) { setStep("bluffs"); }
-                else { launchGame(selectedRoleIds, drunkFakeRoleId, null, []); }
+                else { launchGame(selectedRoleIds, drunkFakeRoleId, null, [], []); }
               }}
               disabled={!drunkFakeRoleId}
               className="flex-grow-[2] p-3 bg-red-900 hover:bg-red-800 disabled:bg-stone-800 disabled:text-stone-600 text-stone-100 ring-1 ring-red-700/50 tracking-[0.2em] uppercase text-sm">
-              {(selectedRoleIds.includes("lunatic") && hasDemonInRoles(selectedRoleIds)) || hasDemonInRoles(selectedRoleIds) ? "Suivant →" : "Confirmer et lancer"}
+              {selectedRoleIds.includes("lunatic") || hasDemonInRoles(selectedRoleIds) ? "Suivant →" : "Confirmer et lancer"}
             </button>
           </div>
         </div>
       )}
 
       {step === "lunatic" && (() => {
-        const demonOptions = selectedRoleIds
-          .filter(id => script.roles[id]?.team === "demon")
-          .map(id => ({ id, ...script.roles[id] }));
+        // Bug 2 : le Lunatique doit penser être un démon qui n'est PAS dans le jeu
+        const demonOptions = Object.entries(script.roles)
+          .filter(([id, r]) => r.team === "demon" && !selectedRoleIds.includes(id))
+          .map(([id, r]) => ({ id, ...r }));
         return (
           <div>
             <div className="bg-rose-950/40 ring-1 ring-rose-800/40 p-4 mb-6">
               <div className="text-rose-400 text-sm font-medium mb-2">🌙 Lunatique est en jeu</div>
               <p className="text-stone-300 text-sm">
-                Le Lunatique croit être le Démon. Choisis quel Démon il pense être.
+                Le Lunatique croit être le Démon. Choisis quel Démon (absent du jeu) il pense être.
               </p>
             </div>
-            <div className="space-y-2 mb-6">
-              {demonOptions.map(role => {
-                const sel = lunaticFakeDemonId === role.id;
-                return (
-                  <button key={role.id} onClick={() => setLunaticFakeDemonId(role.id)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 ring-1 text-left ${
-                      sel ? "bg-stone-800/70 ring-rose-700/60 text-rose-200" : "bg-stone-900 ring-stone-800 text-stone-300 hover:ring-stone-600"
-                    }`}>
-                    <div className={`w-4 h-4 rounded-full flex-shrink-0 border-2 flex items-center justify-center ${
-                      sel ? "border-rose-700 bg-rose-700" : "border-stone-600"
-                    }`}>{sel && <div className="w-1.5 h-1.5 rounded-full bg-stone-100" />}</div>
-                    <RoleIcon roleId={role.id} size={28} className="flex-shrink-0" />
-                    <div>
-                      <div className="text-sm italic">{role.name}</div>
-                      <div className="text-xs opacity-60 line-clamp-1 mt-0.5">{role.ability}</div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+            {demonOptions.length === 0 ? (
+              <p className="text-stone-500 text-sm italic mb-6">Tous les démons du script sont déjà en jeu.</p>
+            ) : (
+              <div className="space-y-2 mb-6">
+                {demonOptions.map(role => {
+                  const sel = lunaticFakeDemonId === role.id;
+                  return (
+                    <button key={role.id} onClick={() => setLunaticFakeDemonId(role.id)}
+                      className={`w-full flex items-center gap-3 px-4 py-3 ring-1 text-left ${
+                        sel ? "bg-stone-800/70 ring-rose-700/60 text-rose-200" : "bg-stone-900 ring-stone-800 text-stone-300 hover:ring-stone-600"
+                      }`}>
+                      <div className={`w-4 h-4 rounded-full flex-shrink-0 border-2 flex items-center justify-center ${
+                        sel ? "border-rose-700 bg-rose-700" : "border-stone-600"
+                      }`}>{sel && <div className="w-1.5 h-1.5 rounded-full bg-stone-100" />}</div>
+                      <RoleIcon roleId={role.id} size={28} className="flex-shrink-0" />
+                      <div>
+                        <div className="text-sm italic">{role.name}</div>
+                        <div className="text-xs opacity-60 line-clamp-1 mt-0.5">{role.ability}</div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             <div className="flex gap-2">
               <button onClick={() => { setStep(selectedRoleIds.includes("drunk") ? "drunk" : "roles"); setLunaticFakeDemonId(null); }}
                 className="flex-1 p-3 bg-stone-900 ring-1 ring-stone-700 text-stone-400 text-sm">← Retour</button>
               <button
-                onClick={() => {
-                  if (hasDemonInRoles(selectedRoleIds)) { setStep("bluffs"); }
-                  else { launchGame(selectedRoleIds, drunkFakeRoleId, lunaticFakeDemonId, []); }
-                }}
-                disabled={!lunaticFakeDemonId}
+                onClick={() => setStep("lunatic-bluffs")}
+                disabled={!lunaticFakeDemonId && demonOptions.length > 0}
                 className="flex-grow-[2] p-3 bg-red-900 hover:bg-red-800 disabled:bg-stone-800 disabled:text-stone-600 text-stone-100 ring-1 ring-red-700/50 tracking-[0.2em] uppercase text-sm">
-                {hasDemonInRoles(selectedRoleIds) ? "Suivant →" : "Confirmer et lancer"}
+                Suivant →
               </button>
             </div>
           </div>
         );
       })()}
+
+      {step === "lunatic-bluffs" && (
+        <div>
+          <div className="bg-rose-950/40 ring-1 ring-rose-800/40 p-4 mb-6">
+            <div className="text-rose-400 text-sm font-medium mb-2">🌙 Bluffs du Lunatique</div>
+            <p className="text-stone-300 text-sm">
+              Choisis <strong>3 rôles Townsfolk</strong> que le Lunatique pourra prétendre être.
+              Ces rôles sont distincts de ceux du Démon.
+            </p>
+          </div>
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-stone-400 text-xs uppercase tracking-[0.2em]">Rôles disponibles</div>
+            <span className={lunaticBluffRoleIds.length === 3 ? "text-rose-400 text-sm" : "text-stone-500 text-sm"}>
+              {lunaticBluffRoleIds.length}/3
+            </span>
+          </div>
+          <div className="space-y-2 mb-6">
+            {bluffCandidates.map(role => {
+              const tc = TEAM_COLORS.townsfolk;
+              const sel = lunaticBluffRoleIds.includes(role.id);
+              const disabled = !sel && lunaticBluffRoleIds.length >= 3;
+              return (
+                <button key={role.id}
+                  onClick={() => {
+                    if (sel) setLunaticBluffRoleIds(prev => prev.filter(x => x !== role.id));
+                    else if (!disabled) setLunaticBluffRoleIds(prev => [...prev, role.id]);
+                  }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 ring-1 text-left transition-all ${
+                    sel ? `bg-stone-800/70 ring-rose-700/60 ${tc.text}`
+                    : disabled ? "bg-stone-950 ring-stone-800 text-stone-600 cursor-not-allowed"
+                    : "bg-stone-900 ring-stone-800 text-stone-300 hover:ring-stone-600"
+                  }`}>
+                  <div className={`w-4 h-4 flex-shrink-0 border flex items-center justify-center text-[10px] font-bold ${
+                    sel ? "bg-rose-800 border-transparent text-stone-100" : "border-stone-600"
+                  }`}>{sel && "✓"}</div>
+                  <RoleIcon roleId={role.id} size={28} className="flex-shrink-0" />
+                  <div>
+                    <div className="text-sm italic">{role.name}</div>
+                    <div className="text-xs text-stone-500 line-clamp-1 mt-0.5">{role.ability}</div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex gap-2">
+            <button onClick={() => { setStep("lunatic"); setLunaticBluffRoleIds([]); }}
+              className="flex-1 p-3 bg-stone-900 ring-1 ring-stone-700 text-stone-400 text-sm">← Retour</button>
+            <button
+              onClick={() => {
+                if (hasDemonInRoles(selectedRoleIds)) { setStep("bluffs"); }
+                else { launchGame(selectedRoleIds, drunkFakeRoleId, lunaticFakeDemonId, lunaticBluffRoleIds, []); }
+              }}
+              disabled={lunaticBluffRoleIds.length !== 3}
+              className="flex-grow-[2] p-3 bg-red-900 hover:bg-red-800 disabled:bg-stone-800 disabled:text-stone-600 text-stone-100 ring-1 ring-red-700/50 tracking-[0.2em] uppercase text-sm">
+              {lunaticBluffRoleIds.length === 3
+                ? hasDemonInRoles(selectedRoleIds) ? "Suivant →" : "Confirmer et lancer"
+                : `${3 - lunaticBluffRoleIds.length} bluff(s) manquant(s)`}
+            </button>
+          </div>
+        </div>
+      )}
 
       {step === "bluffs" && (
         <div>
@@ -593,11 +658,11 @@ function SimLobby({ game, me, dispatch, prefillRoleInfo }: any) {
           </div>
           <div className="flex gap-2">
             <button onClick={() => {
-              const prev = selectedRoleIds.includes("lunatic") ? "lunatic"
+              const prev = selectedRoleIds.includes("lunatic") ? "lunatic-bluffs"
                 : selectedRoleIds.includes("drunk") ? "drunk" : "roles";
               setStep(prev); setDemonBluffRoleIds([]);
             }} className="flex-1 p-3 bg-stone-900 ring-1 ring-stone-700 text-stone-400 text-sm">← Retour</button>
-            <button onClick={() => launchGame(selectedRoleIds, drunkFakeRoleId, lunaticFakeDemonId, demonBluffRoleIds)}
+            <button onClick={() => launchGame(selectedRoleIds, drunkFakeRoleId, lunaticFakeDemonId, lunaticBluffRoleIds, demonBluffRoleIds)}
               disabled={demonBluffRoleIds.length !== 3}
               className="flex-grow-[2] p-3 bg-red-900 hover:bg-red-800 disabled:bg-stone-800 disabled:text-stone-600 text-stone-100 ring-1 ring-red-700/50 tracking-[0.2em] uppercase text-sm">
               {demonBluffRoleIds.length === 3 ? "Confirmer et lancer" : `${3 - demonBluffRoleIds.length} bluff(s) manquant(s)`}
