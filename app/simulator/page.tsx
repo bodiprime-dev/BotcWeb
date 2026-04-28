@@ -287,9 +287,10 @@ function SimLobby({ game, me, dispatch, prefillRoleInfo }: any) {
   const playableCount = game.players.length - 1;
   const canStart = playableCount >= 5 && isStoryteller;
 
-  const [step, setStep] = useState<"players" | "roles" | "drunk" | "bluffs">("players");
+  const [step, setStep] = useState<"players" | "roles" | "drunk" | "lunatic" | "bluffs">("players");
   const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
   const [drunkFakeRoleId, setDrunkFakeRoleId] = useState<string | null>(null);
+  const [lunaticFakeDemonId, setLunaticFakeDemonId] = useState<string | null>(null);
   const [demonBluffRoleIds, setDemonBluffRoleIds] = useState<string[]>([]);
   const [newName, setNewName] = useState("");
 
@@ -298,12 +299,13 @@ function SimLobby({ game, me, dispatch, prefillRoleInfo }: any) {
   const hasDemonInRoles = (roleIds: string[]) =>
     roleIds.some(id => script.roles[id]?.team === "demon");
 
-  const launchGame = (roleIds: string[], fakeRoleId: string | null, bluffIds: string[]) => {
+  const launchGame = (roleIds: string[], fakeRoleId: string | null, lunaticDemonId: string | null, bluffIds: string[]) => {
     dispatch({
       type: "START_GAME",
       storytellerId: game.players[0].id,
       selectedRoleIds: roleIds,
       drunkFakeRoleId: fakeRoleId,
+      lunaticFakeDemonId: lunaticDemonId,
       demonBluffRoleIds: bluffIds.length === 3 ? [bluffIds[0], bluffIds[1], bluffIds[2]] : null,
       prefillRoleInfo,
     });
@@ -311,16 +313,19 @@ function SimLobby({ game, me, dispatch, prefillRoleInfo }: any) {
 
   const launch = (roleIds: string[]) => {
     if (roleIds.includes("drunk")) {
-      const opts = roleIds.filter(id => id !== "drunk" && script.roles[id]?.team === "townsfolk");
+      const opts = Object.keys(script.roles).filter(
+        id => script.roles[id].team === "townsfolk" && !roleIds.includes(id)
+      );
       if (opts.length > 0) { setStep("drunk"); return; }
     }
+    if (roleIds.includes("lunatic") && hasDemonInRoles(roleIds)) { setStep("lunatic"); return; }
     if (hasDemonInRoles(roleIds)) { setStep("bluffs"); return; }
-    launchGame(roleIds, null, []);
+    launchGame(roleIds, null, null, []);
   };
 
-  const fakeRoleOptions = selectedRoleIds
-    .filter(id => id !== "drunk" && script.roles[id]?.team === "townsfolk")
-    .map(id => ({ id, ...script.roles[id] }));
+  const fakeRoleOptions = Object.entries(script.roles)
+    .filter(([id, r]) => r.team === "townsfolk" && !selectedRoleIds.includes(id))
+    .map(([id, r]) => ({ id, ...r }));
 
   const bluffCandidates = Object.entries(script.roles)
     .filter(([id, r]) => r.team === "townsfolk" && !selectedRoleIds.includes(id))
@@ -483,16 +488,66 @@ function SimLobby({ game, me, dispatch, prefillRoleInfo }: any) {
               className="flex-1 p-3 bg-stone-900 ring-1 ring-stone-700 text-stone-400 text-sm">← Retour</button>
             <button
               onClick={() => {
-                if (hasDemonInRoles(selectedRoleIds)) { setStep("bluffs"); }
-                else { launchGame(selectedRoleIds, drunkFakeRoleId, []); }
+                if (selectedRoleIds.includes("lunatic") && hasDemonInRoles(selectedRoleIds)) { setStep("lunatic"); }
+                else if (hasDemonInRoles(selectedRoleIds)) { setStep("bluffs"); }
+                else { launchGame(selectedRoleIds, drunkFakeRoleId, null, []); }
               }}
               disabled={!drunkFakeRoleId}
               className="flex-grow-[2] p-3 bg-red-900 hover:bg-red-800 disabled:bg-stone-800 disabled:text-stone-600 text-stone-100 ring-1 ring-red-700/50 tracking-[0.2em] uppercase text-sm">
-              {hasDemonInRoles(selectedRoleIds) ? "Suivant →" : "Confirmer et lancer"}
+              {(selectedRoleIds.includes("lunatic") && hasDemonInRoles(selectedRoleIds)) || hasDemonInRoles(selectedRoleIds) ? "Suivant →" : "Confirmer et lancer"}
             </button>
           </div>
         </div>
       )}
+
+      {step === "lunatic" && (() => {
+        const demonOptions = selectedRoleIds
+          .filter(id => script.roles[id]?.team === "demon")
+          .map(id => ({ id, ...script.roles[id] }));
+        return (
+          <div>
+            <div className="bg-rose-950/40 ring-1 ring-rose-800/40 p-4 mb-6">
+              <div className="text-rose-400 text-sm font-medium mb-2">🌙 Lunatique est en jeu</div>
+              <p className="text-stone-300 text-sm">
+                Le Lunatique croit être le Démon. Choisis quel Démon il pense être.
+              </p>
+            </div>
+            <div className="space-y-2 mb-6">
+              {demonOptions.map(role => {
+                const sel = lunaticFakeDemonId === role.id;
+                return (
+                  <button key={role.id} onClick={() => setLunaticFakeDemonId(role.id)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 ring-1 text-left ${
+                      sel ? "bg-stone-800/70 ring-rose-700/60 text-rose-200" : "bg-stone-900 ring-stone-800 text-stone-300 hover:ring-stone-600"
+                    }`}>
+                    <div className={`w-4 h-4 rounded-full flex-shrink-0 border-2 flex items-center justify-center ${
+                      sel ? "border-rose-700 bg-rose-700" : "border-stone-600"
+                    }`}>{sel && <div className="w-1.5 h-1.5 rounded-full bg-stone-100" />}</div>
+                    <RoleIcon roleId={role.id} size={28} className="flex-shrink-0" />
+                    <div>
+                      <div className="text-sm italic">{role.name}</div>
+                      <div className="text-xs opacity-60 line-clamp-1 mt-0.5">{role.ability}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => { setStep(selectedRoleIds.includes("drunk") ? "drunk" : "roles"); setLunaticFakeDemonId(null); }}
+                className="flex-1 p-3 bg-stone-900 ring-1 ring-stone-700 text-stone-400 text-sm">← Retour</button>
+              <button
+                onClick={() => {
+                  if (hasDemonInRoles(selectedRoleIds)) { setStep("bluffs"); }
+                  else { launchGame(selectedRoleIds, drunkFakeRoleId, lunaticFakeDemonId, []); }
+                }}
+                disabled={!lunaticFakeDemonId}
+                className="flex-grow-[2] p-3 bg-red-900 hover:bg-red-800 disabled:bg-stone-800 disabled:text-stone-600 text-stone-100 ring-1 ring-red-700/50 tracking-[0.2em] uppercase text-sm">
+                {hasDemonInRoles(selectedRoleIds) ? "Suivant →" : "Confirmer et lancer"}
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
       {step === "bluffs" && (
         <div>
@@ -537,9 +592,12 @@ function SimLobby({ game, me, dispatch, prefillRoleInfo }: any) {
             })}
           </div>
           <div className="flex gap-2">
-            <button onClick={() => { setStep(selectedRoleIds.includes("drunk") ? "drunk" : "roles"); setDemonBluffRoleIds([]); }}
-              className="flex-1 p-3 bg-stone-900 ring-1 ring-stone-700 text-stone-400 text-sm">← Retour</button>
-            <button onClick={() => launchGame(selectedRoleIds, drunkFakeRoleId, demonBluffRoleIds)}
+            <button onClick={() => {
+              const prev = selectedRoleIds.includes("lunatic") ? "lunatic"
+                : selectedRoleIds.includes("drunk") ? "drunk" : "roles";
+              setStep(prev); setDemonBluffRoleIds([]);
+            }} className="flex-1 p-3 bg-stone-900 ring-1 ring-stone-700 text-stone-400 text-sm">← Retour</button>
+            <button onClick={() => launchGame(selectedRoleIds, drunkFakeRoleId, lunaticFakeDemonId, demonBluffRoleIds)}
               disabled={demonBluffRoleIds.length !== 3}
               className="flex-grow-[2] p-3 bg-red-900 hover:bg-red-800 disabled:bg-stone-800 disabled:text-stone-600 text-stone-100 ring-1 ring-red-700/50 tracking-[0.2em] uppercase text-sm">
               {demonBluffRoleIds.length === 3 ? "Confirmer et lancer" : `${3 - demonBluffRoleIds.length} bluff(s) manquant(s)`}
@@ -590,6 +648,20 @@ function RoleInfoDisplay({ roleInfo, players, scriptId }: {
                 </div>
               );
             case "two_players_one_role":
+              if (entry.result !== undefined) {
+                return (
+                  <div key={i} className="text-sm text-stone-300 leading-relaxed">
+                    <span className="text-amber-200 font-medium">{getPlayerName(entry.playerAId)}</span>
+                    {" & "}
+                    <span className="text-amber-200 font-medium">{getPlayerName(entry.playerBId)}</span>
+                    {" → "}
+                    <span className={entry.result ? "text-green-400 font-bold" : "text-red-400 font-bold"}>
+                      {entry.result ? "OUI" : "NON"}
+                    </span>
+                    <span className="text-stone-500 text-xs ml-1">(Devin)</span>
+                  </div>
+                );
+              }
               return (
                 <div key={i} className="text-sm text-stone-300 leading-relaxed">
                   L'un de{" "}
@@ -608,10 +680,14 @@ function RoleInfoDisplay({ roleInfo, players, scriptId }: {
                 <div key={i} className="text-sm text-stone-300 leading-relaxed">
                   <span className="text-amber-200 font-medium">{getPlayerName(entry.playerId)}</span>
                   {" "}est{" "}
-                  <span className="inline-flex items-center gap-1 align-middle">
-                    <RoleIcon roleId={entry.roleId} size={18} />
-                    <span className="italic">{script.roles[entry.roleId]?.name ?? entry.roleId}</span>
-                  </span>.
+                  {entry.label ? (
+                    <span className="text-amber-100 italic font-medium">{entry.label}</span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 align-middle">
+                      <RoleIcon roleId={entry.roleId} size={18} />
+                      <span className="italic">{script.roles[entry.roleId]?.name ?? entry.roleId}</span>
+                    </span>
+                  )}.
                 </div>
               );
             case "role_list":
@@ -667,6 +743,7 @@ function RoleInfoEditor({ player, allPlayers, scriptId, onSave }: {
   const [playerBId, setPlayerBId] = useState("");
   const [roleId, setRoleId] = useState("");
   const [pickedRoleIds, setPickedRoleIds] = useState<string[]>([]);
+  const [fortuneResult, setFortuneResult] = useState<boolean>(true);
 
   const nonSt = allPlayers.filter((p: any) => !p.isStoryteller && p.id !== player.id);
   const roleInfo: any[] = player.roleInfo ?? [];
@@ -674,7 +751,7 @@ function RoleInfoEditor({ player, allPlayers, scriptId, onSave }: {
   const resetForm = () => {
     setTextContent(""); setCountLabel(""); setCountValue(0);
     setPlayerAId(""); setPlayerBId(""); setRoleId(""); setPickedRoleIds([]);
-    setKind("text"); setEditing(false);
+    setFortuneResult(true); setKind("text"); setEditing(false);
   };
 
   const addEntry = () => {
@@ -683,6 +760,7 @@ function RoleInfoEditor({ player, allPlayers, scriptId, onSave }: {
       case "text": if (!textContent.trim()) return; entry = { kind: "text", content: textContent.trim() }; break;
       case "count": if (!countLabel.trim()) return; entry = { kind: "count", label: countLabel.trim(), value: countValue }; break;
       case "two_players_one_role": if (!playerAId || !playerBId || !roleId) return; entry = { kind: "two_players_one_role", playerAId, playerBId, roleId }; break;
+      case "fortune_result": if (!playerAId || !playerBId) return; entry = { kind: "two_players_one_role", playerAId, playerBId, roleId: "", result: fortuneResult }; break;
       case "player_and_role": if (!playerAId || !roleId) return; entry = { kind: "player_and_role", playerId: playerAId, roleId }; break;
       case "role_list": entry = { kind: "role_list", roleIds: pickedRoleIds }; break;
       case "bluffs": if (pickedRoleIds.length !== 3) return; entry = { kind: "bluffs", roleIds: pickedRoleIds as [string, string, string] }; break;
@@ -716,8 +794,15 @@ function RoleInfoEditor({ player, allPlayers, scriptId, onSave }: {
                   )}
                   {entry.kind === "count" && <span>{entry.label}: <strong className="text-indigo-300">{entry.value}</strong></span>}
                   {entry.kind === "text" && <span className="italic text-stone-400 line-clamp-2">{entry.content}</span>}
-                  {entry.kind === "two_players_one_role" && <span>{getPlayerName(entry.playerAId)} / {getPlayerName(entry.playerBId)} → {script.roles[entry.roleId]?.name ?? entry.roleId}</span>}
-                  {entry.kind === "player_and_role" && <span>{getPlayerName(entry.playerId)} → {script.roles[entry.roleId]?.name ?? entry.roleId}</span>}
+                  {entry.kind === "two_players_one_role" && entry.result !== undefined && (
+                    <span>{getPlayerName(entry.playerAId)} / {getPlayerName(entry.playerBId)} → <strong>{entry.result ? "OUI" : "NON"}</strong> (Devin)</span>
+                  )}
+                  {entry.kind === "two_players_one_role" && entry.result === undefined && (
+                    <span>{getPlayerName(entry.playerAId)} / {getPlayerName(entry.playerBId)} → {script.roles[entry.roleId]?.name ?? entry.roleId}</span>
+                  )}
+                  {entry.kind === "player_and_role" && (
+                    <span>{getPlayerName(entry.playerId)} → {entry.label ?? (script.roles[entry.roleId]?.name ?? entry.roleId)}</span>
+                  )}
                   {entry.kind === "role_list" && <span>Rôles: {(entry.roleIds as string[]).map((id: string) => script.roles[id]?.name ?? id).join(", ") || "aucun"}</span>}
                 </div>
                 <button onClick={() => onSave(roleInfo.filter((_: any, idx: number) => idx !== i))}
@@ -741,6 +826,7 @@ function RoleInfoEditor({ player, allPlayers, scriptId, onSave }: {
             className="w-full px-2 py-1.5 bg-stone-900 ring-1 ring-stone-700 text-stone-200 text-xs">
             <option value="bluffs">Bluffs Démon (3 rôles)</option>
             <option value="two_players_one_role">2 joueurs + 1 rôle</option>
+            <option value="fortune_result">Devin — 2 joueurs + OUI/NON</option>
             <option value="player_and_role">1 joueur + 1 rôle</option>
             <option value="role_list">Liste de rôles</option>
             <option value="count">Nombre</option>
@@ -758,25 +844,46 @@ function RoleInfoEditor({ player, allPlayers, scriptId, onSave }: {
                 className="w-16 px-2 py-1.5 bg-stone-900 ring-1 ring-stone-700 text-stone-200 text-xs text-center" />
             </div>
           )}
-          {(kind === "two_players_one_role" || kind === "player_and_role") && (
+          {(kind === "two_players_one_role" || kind === "player_and_role" || kind === "fortune_result") && (
             <>
               <select value={playerAId} onChange={e => setPlayerAId(e.target.value)}
                 className="w-full px-2 py-1.5 bg-stone-900 ring-1 ring-stone-700 text-stone-200 text-xs">
                 <option value="">Joueur A…</option>
                 {nonSt.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
-              {kind === "two_players_one_role" && (
+              {(kind === "two_players_one_role" || kind === "fortune_result") && (
                 <select value={playerBId} onChange={e => setPlayerBId(e.target.value)}
                   className="w-full px-2 py-1.5 bg-stone-900 ring-1 ring-stone-700 text-stone-200 text-xs">
                   <option value="">Joueur B…</option>
                   {nonSt.filter((p: any) => p.id !== playerAId).map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
               )}
-              <select value={roleId} onChange={e => setRoleId(e.target.value)}
-                className="w-full px-2 py-1.5 bg-stone-900 ring-1 ring-stone-700 text-stone-200 text-xs">
-                <option value="">Rôle…</option>
-                {Object.entries(script.roles).map(([id, r]) => <option key={id} value={id}>{r.name}</option>)}
-              </select>
+              {kind === "fortune_result" && (
+                <div className="flex gap-2">
+                  <button onClick={() => setFortuneResult(true)}
+                    className={`flex-1 p-1.5 text-xs ring-1 ${fortuneResult ? "bg-green-900 ring-green-700 text-green-100" : "bg-stone-900 ring-stone-700 text-stone-400"}`}>
+                    OUI
+                  </button>
+                  <button onClick={() => setFortuneResult(false)}
+                    className={`flex-1 p-1.5 text-xs ring-1 ${!fortuneResult ? "bg-red-900 ring-red-700 text-red-100" : "bg-stone-900 ring-stone-700 text-stone-400"}`}>
+                    NON
+                  </button>
+                </div>
+              )}
+              {kind === "two_players_one_role" && (
+                <select value={roleId} onChange={e => setRoleId(e.target.value)}
+                  className="w-full px-2 py-1.5 bg-stone-900 ring-1 ring-stone-700 text-stone-200 text-xs">
+                  <option value="">Rôle…</option>
+                  {Object.entries(script.roles).map(([id, r]) => <option key={id} value={id}>{r.name}</option>)}
+                </select>
+              )}
+              {kind === "player_and_role" && (
+                <select value={roleId} onChange={e => setRoleId(e.target.value)}
+                  className="w-full px-2 py-1.5 bg-stone-900 ring-1 ring-stone-700 text-stone-200 text-xs">
+                  <option value="">Rôle…</option>
+                  {Object.entries(script.roles).map(([id, r]) => <option key={id} value={id}>{r.name}</option>)}
+                </select>
+              )}
             </>
           )}
           {(kind === "role_list" || kind === "bluffs") && (
@@ -829,7 +936,7 @@ function SimStorytellerView({ game, me, dispatch }: any) {
     .map((p: any) => {
       const realRoleId = p.role;
       const displayRoleId = p.displayRole || p.role;
-      const orderRoleId = realRoleId === "drunk" ? displayRoleId : realRoleId;
+      const orderRoleId = (realRoleId === "drunk" || realRoleId === "lunatic") ? displayRoleId : realRoleId;
       const orderRole = ROLES[orderRoleId];
       if (!orderRole) return null;
       const order = isFirstNight ? orderRole.firstNight : orderRole.otherNight;
@@ -844,12 +951,27 @@ function SimStorytellerView({ game, me, dispatch }: any) {
   // Ouverture auto en phase nuit (utile pour voir l'ordre nocturne)
   useEffect(() => { if (game.phase === "night") setPanelOpen(true); }, [game.phase]);
 
-  // Rayon adaptatif : croissance basée sur le nombre de joueurs, plafond
-  // qui dépend de l'état du drawer (drawer fermé → plus de place dispo).
-  const radius = panelOpen
-    ? Math.min(280, 110 + playable.length * 22)
-    : Math.min(400, 140 + playable.length * 28);
-  const center = radius + 60;
+  // Dimensions de la fenêtre pour un cercle proportionnel à l'écran
+  const [vw, setVw] = useState(800);
+  const [vh, setVh] = useState(600);
+  useEffect(() => {
+    const update = () => { setVw(window.innerWidth); setVh(window.innerHeight); };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+
+  // Rayon : occupe jusqu'à ~42 % du côté disponible le plus court,
+  // tout en respectant l'espacement minimal entre icônes (n × 16 px).
+  const availW = panelOpen ? Math.max(vw - 360, 200) : vw - 32;
+  const availH = vh - 200;
+  const screenMax = Math.min(availW, availH) * 0.42;
+  const radius = Math.max(90, Math.min(playable.length * 16, screenMax));
+
+  // Taille des icônes proportionnelle au rayon
+  const iconBox = Math.max(60, Math.min(88, Math.round(radius * 0.42 + 22)));
+  const iconSize = Math.round(iconBox * 0.65);
+  const center = radius + iconBox / 2 + 24;
   const size = center * 2;
 
   const closePanel = () => { setSelectedId(null); setPanelOpen(false); };
@@ -894,15 +1016,16 @@ function SimStorytellerView({ game, me, dispatch }: any) {
           </div>
         </div>
         <div className="relative" style={{ width: size, height: size, maxWidth: "100%" }}>
-          <div className="absolute inset-12 rounded-full ring-1 ring-stone-700/40" />
-          <div className="absolute inset-20 rounded-full ring-1 ring-stone-800/40" />
+          <div className="absolute rounded-full ring-1 ring-stone-700/40" style={{ inset: Math.round(size * 0.1) }} />
+          <div className="absolute rounded-full ring-1 ring-stone-800/40" style={{ inset: Math.round(size * 0.18) }} />
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <Skull className="w-10 h-10 text-stone-700" strokeWidth={1.2} />
           </div>
           {playable.map((p: any, i: number) => {
             const angle = (i / playable.length) * 2 * Math.PI - Math.PI / 2;
-            const x = center + radius * Math.cos(angle) - 36;
-            const y = center + radius * Math.sin(angle) - 36;
+            const half = iconBox / 2;
+            const x = center + radius * Math.cos(angle) - half;
+            const y = center + radius * Math.sin(angle) - half;
             const role = ROLES[p.role!];
             const team = TEAM_COLORS[role.team as Team];
             const isNominee = game.nominee === p.id;
@@ -910,10 +1033,12 @@ function SimStorytellerView({ game, me, dispatch }: any) {
             return (
               <button key={p.id} onClick={() => setSelectedId(p.id === selectedId ? null : p.id)}
                 className="absolute" style={{ left: x, top: y }}>
-                <div className={`w-[72px] h-[72px] rounded-full ${team.bg} ring-2 flex flex-col items-center justify-center transition-all relative ${
-                  selectedId === p.id ? "scale-110 ring-amber-400" : isNominee ? "ring-orange-400" : team.ring
-                } ${!p.alive ? "opacity-40 grayscale" : ""}`}>
-                  <RoleIcon roleId={p.role!} size={46} />
+                <div
+                  style={{ width: iconBox, height: iconBox }}
+                  className={`rounded-full ${team.bg} ring-2 flex flex-col items-center justify-center transition-all relative ${
+                    selectedId === p.id ? "scale-110 ring-amber-400" : isNominee ? "ring-orange-400" : team.ring
+                  } ${!p.alive ? "opacity-40 grayscale" : ""}`}>
+                  <RoleIcon roleId={p.role!} size={iconSize} />
                   <div className={`text-[8px] font-medium ${team.text} px-1 text-center leading-tight`}>
                     {role.name}{isDrunk ? " 🍺" : ""}
                   </div>

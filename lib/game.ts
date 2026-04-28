@@ -144,6 +144,16 @@ function buildRoleInfo(
       return [{ kind: "bluffs", roleIds: demonBluffs }];
     }
 
+    // ─── Devin : red herring (1ère nuit) ──────────────────────────────
+    case "fortuneteller": {
+      const goodOnes = shuffle(nonSt.filter(p =>
+        script.roles[p.role!]?.team === "townsfolk" ||
+        script.roles[p.role!]?.team === "outsider"
+      ));
+      if (goodOnes.length < 1) return [];
+      return [{ kind: "player_and_role", playerId: goodOnes[0].id, roleId: "fortuneteller", label: "Red Herring" }];
+    }
+
     default:
       return [];
   }
@@ -213,10 +223,15 @@ export function applyAction(state: GameState, action: GameAction): GameState {
         }
         const realRole = assignedRoles[roleIdx++];
         const isDrunk = realRole === "drunk";
+        const isLunatic = realRole === "lunatic";
         return {
           ...p,
           role: realRole,
-          displayRole: isDrunk && action.drunkFakeRoleId ? action.drunkFakeRoleId : realRole,
+          displayRole: isDrunk && action.drunkFakeRoleId
+            ? action.drunkFakeRoleId
+            : isLunatic && action.lunaticFakeDemonId
+            ? action.lunaticFakeDemonId
+            : realRole,
           isStoryteller: false,
           roleInfo: [],
         };
@@ -229,6 +244,15 @@ export function applyAction(state: GameState, action: GameAction): GameState {
         ? playersWithRoles
         : playersWithRoles.map((p) => {
             if (p.isStoryteller || !p.role) return p;
+            if (p.role === "drunk" && p.displayRole) {
+              // Drunk gets false info: generate for their fake role but with rotated player assignments
+              const nonSt = playersWithRoles.filter(q => !q.isStoryteller && q.role);
+              const roles = nonSt.map(q => q.role!);
+              const rotated = [roles[roles.length - 1], ...roles.slice(0, -1)];
+              const falsePlayers = nonSt.map((q, i) => ({ ...q, role: rotated[i], displayRole: rotated[i] }));
+              const infoPlayers = playersWithRoles.map(q => falsePlayers.find(f => f.id === q.id) ?? q);
+              return { ...p, roleInfo: buildRoleInfo(p.displayRole, infoPlayers, script, demonBluffs) };
+            }
             return { ...p, roleInfo: buildRoleInfo(p.role, playersWithRoles, script, demonBluffs) };
           });
 
