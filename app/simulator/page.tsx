@@ -50,9 +50,18 @@ export default function SimulatorPage() {
   const [game, setGame] = useState<GameState | null>(null);
   const [scriptId, setScriptId] = useState("trouble-brewing");
   const [viewerId, setViewerId] = useState<string | null>(null);
+  const [prefillRoleInfo, setPrefillRoleInfo] = useState(false);
 
   const dispatch = (action: GameAction) =>
-    setGame(prev => prev ? applyAction(prev, action) : prev);
+    setGame(prev => {
+      if (!prev) return prev;
+      let next = applyAction(prev, action);
+      // Si le pré-remplissage est désactivé, on efface les infos générées au lancement
+      if (action.type === "START_GAME" && !prefillRoleInfo) {
+        next = { ...next, players: next.players.map(p => ({ ...p, roleInfo: [] })) };
+      }
+      return next;
+    });
 
   const startNewSimulation = () => {
     let g = createNewGame(scriptId);
@@ -102,6 +111,27 @@ export default function SimulatorPage() {
               </button>
             ))}
           </div>
+
+          <button
+            onClick={() => setPrefillRoleInfo(v => !v)}
+            className={`w-full flex items-center gap-3 p-3 mb-4 ring-1 text-left transition-all ${
+              prefillRoleInfo
+                ? "bg-stone-800 ring-indigo-700/60 text-indigo-200"
+                : "bg-stone-900 ring-stone-700 text-stone-400 hover:ring-stone-600"
+            }`}
+          >
+            <div className={`w-4 h-4 flex-shrink-0 border-2 flex items-center justify-center transition-all ${
+              prefillRoleInfo ? "bg-indigo-700 border-indigo-600" : "border-stone-600"
+            }`}>
+              {prefillRoleInfo && <span className="text-[10px] font-bold text-white leading-none">✓</span>}
+            </div>
+            <div>
+              <div className="text-sm">Pré-remplir les infos de rôle</div>
+              <div className="text-xs text-stone-500 mt-0.5">
+                Génère automatiquement bluffs, lavandière, grand-mère… au lancement
+              </div>
+            </div>
+          </button>
 
           <button
             onClick={startNewSimulation}
