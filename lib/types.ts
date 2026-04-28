@@ -7,8 +7,8 @@ export type Phase = "lobby" | "day" | "night";
 
 export type RoleInfoEntry =
   | { kind: "bluffs"; roleIds: [string, string, string] }
-  | { kind: "two_players_one_role"; playerAId: string; playerBId: string; roleId: string }
-  | { kind: "player_and_role"; playerId: string; roleId: string }
+  | { kind: "two_players_one_role"; playerAId: string; playerBId: string; roleId: string; result?: boolean }
+  | { kind: "player_and_role"; playerId: string; roleId: string; label?: string }
   | { kind: "role_list"; roleIds: string[] }
   | { kind: "count"; label: string; value: number }
   | { kind: "text"; content: string };
@@ -60,7 +60,7 @@ export interface PlayerView {
 export type GameAction =
   | { type: "ADD_PLAYER"; name: string }
   | { type: "REMOVE_PLAYER"; playerId: string }
-  | { type: "START_GAME"; storytellerId: string; selectedRoleIds: string[]; drunkFakeRoleId?: string | null; demonBluffRoleIds?: [string, string, string] | null; prefillRoleInfo?: boolean }
+  | { type: "START_GAME"; storytellerId: string; selectedRoleIds: string[]; drunkFakeRoleId?: string | null; lunaticFakeDemonId?: string | null; demonBluffRoleIds?: [string, string, string] | null; prefillRoleInfo?: boolean }
   | { type: "TOGGLE_ALIVE"; playerId: string; storytellerId: string }
   | { type: "TOGGLE_POISON"; playerId: string; storytellerId: string }
   | { type: "SET_NOMINEE"; playerId: string | null; storytellerId: string }
