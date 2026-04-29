@@ -1181,8 +1181,8 @@ function StorytellerView({ game, me, dispatch, onLeave }: any) {
   const availW = panelOpen ? Math.max(vw - 360, 200) : vw - 32;
   const availH = vh - 200;
   const screenMax = Math.min(availW, availH) * 0.42;
-  const radius = Math.max(90, Math.min(playablePlayers.length * 16, screenMax));
-  const iconBox = Math.max(60, Math.min(88, Math.round(radius * 0.42 + 22)));
+  const radius = Math.max(90, Math.min(playablePlayers.length * 28, screenMax));
+  const iconBox = Math.max(60, Math.min(96, Math.round(radius * 0.42 + 22)));
   const iconSize = Math.round(iconBox * 0.65);
   const center = radius + iconBox / 2 + 24;
   const size = center * 2;

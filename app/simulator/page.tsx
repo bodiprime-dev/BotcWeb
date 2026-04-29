@@ -1227,14 +1227,14 @@ function SimStorytellerView({ game, me, dispatch }: any) {
   }, []);
 
   // Rayon : occupe jusqu'à ~42 % du côté disponible le plus court,
-  // tout en respectant l'espacement minimal entre icônes (n × 16 px).
+  // tout en respectant l'espacement minimal entre icônes (n × 28 px).
   const availW = panelOpen ? Math.max(vw - 360, 200) : vw - 32;
   const availH = vh - 200;
   const screenMax = Math.min(availW, availH) * 0.42;
-  const radius = Math.max(90, Math.min(playable.length * 16, screenMax));
+  const radius = Math.max(90, Math.min(playable.length * 28, screenMax));
 
   // Taille des icônes proportionnelle au rayon
-  const iconBox = Math.max(60, Math.min(88, Math.round(radius * 0.42 + 22)));
+  const iconBox = Math.max(60, Math.min(96, Math.round(radius * 0.42 + 22)));
   const iconSize = Math.round(iconBox * 0.65);
   const center = radius + iconBox / 2 + 24;
   const size = center * 2;
