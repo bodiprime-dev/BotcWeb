@@ -116,24 +116,28 @@ Champs notables :
 
 ---
 
-## Grimoire (cercle)
+## Grimoire (ovale)
 
 Présent dans `SimStorytellerView` (simulateur) et `StorytellerView` (jeu réel) — **code identique**.
 
+Le grimoire est une ellipse : `ry` (vertical) est limité par la hauteur de l'écran, `rx` (horizontal) exploite toute la largeur disponible jusqu'à `2×ry`.
+
 ```typescript
-// Taille adaptive selon la fenêtre
+// Ellipse adaptive selon la fenêtre
 const availW = panelOpen ? Math.max(vw - 360, 200) : vw - 32;
 const availH = vh - 200;
-const screenMax = Math.min(availW, availH) * 0.42;
-const radius = Math.max(90, Math.min(playable.length * 16, screenMax));
-
-const iconBox = Math.max(60, Math.min(88, Math.round(radius * 0.42 + 22)));
+const ry = Math.max(90, Math.min(playable.length * 28, availH * 0.42));
+const iconBox = Math.max(60, Math.min(96, Math.round(ry * 0.42 + 22)));
 const iconSize = Math.round(iconBox * 0.65);
-const center = radius + iconBox / 2 + 24;
-const size = center * 2;
+const rx = Math.min(Math.floor((availW - iconBox - 48) / 2), Math.round(ry * 2.0));
+const cx = rx + iconBox / 2 + 24;
+const cy = ry + iconBox / 2 + 24;
+const totalW = Math.round(cx * 2);
+const totalH = Math.round(cy * 2);
+// Position joueur i : x = cx + rx*cos(angle) - half, y = cy + ry*sin(angle) - half
 ```
 
-Les cercles décoratifs sont calculés relativement à `size` (`size * 0.1`, `size * 0.18`).
+Les anneaux décoratifs sont des `div` `rounded-full` rectangulaires dont les insets horizontaux/verticaux sont proportionnels à `totalW`/`totalH` (`* 0.1` et `* 0.18`).
 
 ---
 
