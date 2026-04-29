@@ -206,6 +206,17 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       return { ...state, players: state.players.filter(p => p.id !== action.playerId) };
     }
 
+    case "REORDER_PLAYERS": {
+      if (state.phase !== "lobby") return state;
+      const idx = state.players.findIndex(p => p.id === action.playerId);
+      if (idx <= 0) return state; // GM (index 0) cannot be moved, and player not found
+      const swapIdx = action.direction === "up" ? idx - 1 : idx + 1;
+      if (swapIdx <= 0 || swapIdx >= state.players.length) return state; // can't swap with GM or out of bounds
+      const players = [...state.players];
+      [players[idx], players[swapIdx]] = [players[swapIdx], players[idx]];
+      return { ...state, players };
+    }
+
     case "START_GAME": {
       if (state.phase !== "lobby") return state;
       if (state.players.length < 5) return state;
@@ -347,6 +358,19 @@ export function applyAction(state: GameState, action: GameAction): GameState {
         ...state,
         players: state.players.map(p =>
           p.id === action.playerId ? { ...p, roleInfo: action.roleInfo } : p
+        ),
+      };
+    }
+
+    case "SET_PLAYER_ROLE": {
+      if (action.storytellerId !== state.storytellerId) return state;
+      if (state.phase === "lobby") return state;
+      return {
+        ...state,
+        players: state.players.map(p =>
+          p.id === action.playerId
+            ? { ...p, role: action.roleId, displayRole: action.roleId, roleInfo: [] }
+            : p
         ),
       };
     }

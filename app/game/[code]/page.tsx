@@ -319,12 +319,31 @@ function Lobby({ game, me, dispatch, onLeave }: any) {
           <div className="text-stone-400 text-xs tracking-[0.2em] uppercase mb-3 flex items-center gap-2">
             <Users className="w-3 h-3" /> Joueurs ({game.players.length})
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-col gap-1">
             {game.players.map((p: any, i: number) => (
               <div key={p.id}
-                className={`inline-flex items-center gap-2 px-3 py-1 ring-1 ${p.id === me.id ? "bg-amber-900/30 ring-amber-700/50 text-amber-100" : "bg-stone-800 ring-stone-700 text-stone-200"}`}>
-                {i === 0 && <Crown className="w-3 h-3 text-amber-400" />}
-                <span className="text-sm">{p.name}</span>
+                className={`flex items-center gap-2 px-3 py-1.5 ring-1 ${p.id === me.id ? "bg-amber-900/30 ring-amber-700/50 text-amber-100" : "bg-stone-800 ring-stone-700 text-stone-200"}`}>
+                {i === 0 ? (
+                  <Crown className="w-3 h-3 text-amber-400 flex-shrink-0" />
+                ) : isStoryteller ? (
+                  <div className="flex flex-col gap-0.5 flex-shrink-0">
+                    <button
+                      onClick={() => dispatch({ type: "REORDER_PLAYERS", playerId: p.id, direction: "up" })}
+                      disabled={i <= 1}
+                      className="text-stone-500 hover:text-stone-300 disabled:opacity-30 disabled:cursor-not-allowed leading-none">
+                      <ChevronUp className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={() => dispatch({ type: "REORDER_PLAYERS", playerId: p.id, direction: "down" })}
+                      disabled={i >= game.players.length - 1}
+                      className="text-stone-500 hover:text-stone-300 disabled:opacity-30 disabled:cursor-not-allowed leading-none">
+                      <ChevronDown className="w-3 h-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="w-4 flex-shrink-0" />
+                )}
+                <span className="text-sm flex-1">{p.name}</span>
                 {i === 0 && <span className="text-[10px] text-amber-400 uppercase tracking-wider">GM</span>}
                 {p.id === me.id && <span className="text-xs text-amber-300">(toi)</span>}
               </div>
@@ -929,6 +948,50 @@ function RoleInfoEditor({ player, allPlayers, scriptId, onSave }: {
   );
 }
 
+function RoleChangePanel({ currentRoleId, scriptId, onSelect }: { currentRoleId: string; scriptId: string; onSelect: (roleId: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const script = SCRIPTS[scriptId];
+  const teamOrder: Team[] = ["townsfolk", "outsider", "minion", "demon"];
+  return (
+    <div className="border-t border-stone-700 mt-3 pt-3">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between text-xs uppercase tracking-[0.15em] text-stone-400 hover:text-stone-200 transition-colors">
+        <span>Changer le rôle</span>
+        {open ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+      </button>
+      {open && (
+        <div className="mt-2 space-y-3">
+          {teamOrder.map(team => {
+            const roles = Object.entries(script.roles).filter(([, r]) => r.team === team);
+            if (!roles.length) return null;
+            const tc = TEAM_COLORS[team];
+            return (
+              <div key={team}>
+                <div className={`text-[10px] uppercase tracking-[0.25em] mb-1 ${tc.text} opacity-70`}>{tc.label}</div>
+                <div className="space-y-0.5">
+                  {roles.map(([id, role]) => (
+                    <button key={id} onClick={() => { onSelect(id); setOpen(false); }}
+                      className={`w-full flex items-center gap-2 px-2 py-1 text-xs text-left ring-1 transition-all ${
+                        id === currentRoleId
+                          ? `${tc.accent} ring-transparent text-stone-100`
+                          : "bg-stone-900 ring-stone-800 text-stone-400 hover:bg-stone-800 hover:text-stone-200"
+                      }`}>
+                      <RoleIcon roleId={id} size={16} className="flex-shrink-0" />
+                      {role.name}
+                      {id === currentRoleId && <span className="ml-auto text-[9px] opacity-60">actuel</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 //  StorytellerView : table + drawer rétractable
 //
@@ -1199,6 +1262,16 @@ function StorytellerView({ game, me, dispatch, onLeave }: any) {
                   {game.nominee === selected.id ? "Nominé" : "Nominer"}
                 </button>
               </div>
+              <RoleChangePanel
+                currentRoleId={selected.role!}
+                scriptId={game.scriptId}
+                onSelect={(roleId) => dispatch({
+                  type: "SET_PLAYER_ROLE",
+                  storytellerId: me.id,
+                  playerId: selected.id,
+                  roleId,
+                })}
+              />
               <RoleInfoEditor
                 player={selected}
                 allPlayers={game.players}

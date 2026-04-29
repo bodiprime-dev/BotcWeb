@@ -60,6 +60,7 @@ export interface PlayerView {
 export type GameAction =
   | { type: "ADD_PLAYER"; name: string }
   | { type: "REMOVE_PLAYER"; playerId: string }
+  | { type: "REORDER_PLAYERS"; playerId: string; direction: "up" | "down" }
   | { type: "START_GAME"; storytellerId: string; selectedRoleIds: string[]; drunkFakeRoleId?: string | null; lunaticFakeDemonId?: string | null; lunaticBluffRoleIds?: [string, string, string] | null; demonBluffRoleIds?: [string, string, string] | null; prefillRoleInfo?: boolean }
   | { type: "TOGGLE_ALIVE"; playerId: string; storytellerId: string }
   | { type: "TOGGLE_POISON"; playerId: string; storytellerId: string }
@@ -67,4 +68,5 @@ export type GameAction =
   | { type: "TOGGLE_PHASE"; storytellerId: string }
   | { type: "NOMINATE"; nominatorId: string; nomineeId: string }
   | { type: "CLEAR_NOMINATION"; storytellerId: string }
-  | { type: "SET_ROLE_INFO"; storytellerId: string; playerId: string; roleInfo: RoleInfoEntry[] };
+  | { type: "SET_ROLE_INFO"; storytellerId: string; playerId: string; roleInfo: RoleInfoEntry[] }
+  | { type: "SET_PLAYER_ROLE"; storytellerId: string; playerId: string; roleId: string };
