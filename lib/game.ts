@@ -258,24 +258,27 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       });
 
       // Passe 2 : calculer les infos de rôle (nécessite de connaître tous les rôles assignés)
-      // Ignorée si prefillRoleInfo est explicitement false (GM a décoché l'option)
+      // Les bluffs (Démon / Lunatique) sont TOUJOURS appliqués car le GM les a choisis.
+      // Les autres infos de rôle (Lavandière, Grand-mère, etc.) ne sont générées que si
+      // prefillRoleInfo !== false.
       const demonBluffs = pickDemonBluffs(script, assignedRoles, action.demonBluffRoleIds);
       const lunaticBluffs = pickLunaticBluffs(script, assignedRoles, demonBluffs, action.lunaticBluffRoleIds);
-      const players = action.prefillRoleInfo === false
-        ? playersWithRoles
-        : playersWithRoles.map((p) => {
-            if (p.isStoryteller || !p.role) return p;
-            if (p.role === "drunk" && p.displayRole) {
-              // Drunk gets false info: generate for their fake role but with rotated player assignments
-              const nonSt = playersWithRoles.filter(q => !q.isStoryteller && q.role);
-              const roles = nonSt.map(q => q.role!);
-              const rotated = [roles[roles.length - 1], ...roles.slice(0, -1)];
-              const falsePlayers = nonSt.map((q, i) => ({ ...q, role: rotated[i], displayRole: rotated[i] }));
-              const infoPlayers = playersWithRoles.map(q => falsePlayers.find(f => f.id === q.id) ?? q);
-              return { ...p, roleInfo: buildRoleInfo(p.displayRole, infoPlayers, script, demonBluffs, lunaticBluffs) };
-            }
-            return { ...p, roleInfo: buildRoleInfo(p.role, playersWithRoles, script, demonBluffs, lunaticBluffs) };
-          });
+      const players = playersWithRoles.map((p) => {
+        if (p.isStoryteller || !p.role) return p;
+        // Démon ou Lunatique : bluffs toujours assignés
+        const isBluffRole = p.role === "lunatic" || script.roles[p.role]?.team === "demon";
+        if (!isBluffRole && action.prefillRoleInfo === false) return p;
+        if (p.role === "drunk" && p.displayRole) {
+          // Drunk gets false info: generate for their fake role but with rotated player assignments
+          const nonSt = playersWithRoles.filter(q => !q.isStoryteller && q.role);
+          const roles = nonSt.map(q => q.role!);
+          const rotated = [roles[roles.length - 1], ...roles.slice(0, -1)];
+          const falsePlayers = nonSt.map((q, i) => ({ ...q, role: rotated[i], displayRole: rotated[i] }));
+          const infoPlayers = playersWithRoles.map(q => falsePlayers.find(f => f.id === q.id) ?? q);
+          return { ...p, roleInfo: buildRoleInfo(p.displayRole, infoPlayers, script, demonBluffs, lunaticBluffs) };
+        }
+        return { ...p, roleInfo: buildRoleInfo(p.role, playersWithRoles, script, demonBluffs, lunaticBluffs) };
+      });
 
       return {
         ...state,
