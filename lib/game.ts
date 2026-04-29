@@ -94,14 +94,17 @@ function buildRoleInfo(
   const nonSt = allPlayers.filter(p => !p.isStoryteller && p.role);
 
   switch (roleId) {
-    // ─── Démons : reçoivent les bluffs ──────────────────────────────
+    // ─── Démons : reçoivent les bluffs + identité du Lunatique s'il y en a un ──
     case "imp":
     case "pukka":
     case "zombuul":
     case "shabaloth":
     case "po": {
-      if (!demonBluffs) return [];
-      return [{ kind: "bluffs", roleIds: demonBluffs }];
+      const entries: RoleInfoEntry[] = [];
+      if (demonBluffs) entries.push({ kind: "bluffs", roleIds: demonBluffs });
+      const lunaticPlayer = allPlayers.find(p => p.role === "lunatic");
+      if (lunaticPlayer) entries.push({ kind: "player_and_role", playerId: lunaticPlayer.id, roleId: "lunatic" });
+      return entries;
     }
 
     // ─── Lavandière : 1 joueur townsfolk parmi 2 ────────────────────
