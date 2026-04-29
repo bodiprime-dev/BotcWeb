@@ -1180,12 +1180,14 @@ function StorytellerView({ game, me, dispatch, onLeave }: any) {
 
   const availW = panelOpen ? Math.max(vw - 360, 200) : vw - 32;
   const availH = vh - 200;
-  const screenMax = Math.min(availW, availH) * 0.42;
-  const radius = Math.max(90, Math.min(playablePlayers.length * 28, screenMax));
-  const iconBox = Math.max(60, Math.min(96, Math.round(radius * 0.42 + 22)));
+  const ry = Math.max(90, Math.min(playablePlayers.length * 28, availH * 0.42));
+  const iconBox = Math.max(60, Math.min(96, Math.round(ry * 0.42 + 22)));
   const iconSize = Math.round(iconBox * 0.65);
-  const center = radius + iconBox / 2 + 24;
-  const size = center * 2;
+  const rx = Math.min(Math.floor((availW - iconBox - 48) / 2), Math.round(ry * 2.0));
+  const cx = rx + iconBox / 2 + 24;
+  const cy = ry + iconBox / 2 + 24;
+  const totalW = Math.round(cx * 2);
+  const totalH = Math.round(cy * 2);
 
   const closePanel = () => {
     setSelectedId(null);
@@ -1257,17 +1259,17 @@ function StorytellerView({ game, me, dispatch, onLeave }: any) {
             <BookOpen className="w-3 h-3" /> Grimoire
           </div>
         </div>
-        <div className="relative" style={{ width: size, height: size, maxWidth: "100%" }}>
-          <div className="absolute rounded-full ring-1 ring-stone-700/40" style={{ inset: Math.round(size * 0.1) }} />
-          <div className="absolute rounded-full ring-1 ring-stone-800/40" style={{ inset: Math.round(size * 0.18) }} />
+        <div className="relative" style={{ width: totalW, height: totalH, maxWidth: "100%" }}>
+          <div className="absolute rounded-full ring-1 ring-stone-700/40" style={{ left: Math.round(totalW * 0.1), right: Math.round(totalW * 0.1), top: Math.round(totalH * 0.1), bottom: Math.round(totalH * 0.1) }} />
+          <div className="absolute rounded-full ring-1 ring-stone-800/40" style={{ left: Math.round(totalW * 0.18), right: Math.round(totalW * 0.18), top: Math.round(totalH * 0.18), bottom: Math.round(totalH * 0.18) }} />
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <Skull className="w-10 h-10 text-stone-700" strokeWidth={1.2} />
           </div>
           {playablePlayers.map((p: any, i: number) => {
             const angle = (i / playablePlayers.length) * 2 * Math.PI - Math.PI / 2;
             const half = iconBox / 2;
-            const x = center + radius * Math.cos(angle) - half;
-            const y = center + radius * Math.sin(angle) - half;
+            const x = cx + rx * Math.cos(angle) - half;
+            const y = cy + ry * Math.sin(angle) - half;
             const role = ROLES[p.role!];
             const team = TEAM_COLORS[role.team as Team];
             const isNominee = game.nominee === p.id;
