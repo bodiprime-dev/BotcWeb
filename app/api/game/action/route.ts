@@ -29,8 +29,6 @@ function isAuthorized(state: GameState, action: GameAction, callerId: string): b
     case "RESOLVE_NOMINATION":
     case "SET_ROLE_INFO":
     case "SET_PLAYER_ROLE":
-    case "SET_NIGHT_PROMPT":
-    case "CLEAR_NIGHT_PROMPT":
     case "ADD_REMINDER":
     case "REMOVE_REMINDER":
     case "TOGGLE_NIGHT_DONE":
@@ -39,8 +37,6 @@ function isAuthorized(state: GameState, action: GameAction, callerId: string): b
       return action.nominatorId === callerId;
     case "VOTE":
       return action.voterId === callerId;
-    case "SUBMIT_NIGHT_PROMPT":
-      return action.playerId === callerId;
     case "SLAYER_SHOOT":
       return action.shooterId === callerId;
     case "SEND_CHAT":

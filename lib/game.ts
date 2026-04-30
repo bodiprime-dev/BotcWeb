@@ -314,8 +314,6 @@ export function applyAction(state: GameState, action: GameAction): GameState {
         poisoned: false,
         ghostVoteUsed: false,
         roleInfo: [],
-        nightPrompt: null,
-        nightSubmission: null,
         reminders: [],
         slayerUsed: false,
       };
@@ -602,52 +600,6 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       };
     }
 
-    case "SET_NIGHT_PROMPT": {
-      if (action.storytellerId !== state.storytellerId) return state;
-      return {
-        ...state,
-        players: state.players.map(p =>
-          p.id === action.playerId
-            ? { ...p, nightPrompt: action.prompt, nightSubmission: null }
-            : p
-        ),
-      };
-    }
-
-    case "SUBMIT_NIGHT_PROMPT": {
-      const player = state.players.find(p => p.id === action.playerId);
-      if (!player || player.isStoryteller) return state;
-      if (!player.nightPrompt) return state;
-      // Validation : pour kind="pick", respecter min/max
-      if (player.nightPrompt.kind === "pick") {
-        const n = action.targetIds.length;
-        if (n < player.nightPrompt.min || n > player.nightPrompt.max) return state;
-        // Cibles doivent exister et ne pas être le Conteur
-        const validIds = new Set(state.players.filter(p => !p.isStoryteller).map(p => p.id));
-        if (!action.targetIds.every(id => validIds.has(id))) return state;
-      }
-      return {
-        ...state,
-        players: state.players.map(p =>
-          p.id === action.playerId
-            ? { ...p, nightSubmission: { targetIds: action.targetIds, at: Date.now() } }
-            : p
-        ),
-      };
-    }
-
-    case "CLEAR_NIGHT_PROMPT": {
-      if (action.storytellerId !== state.storytellerId) return state;
-      return {
-        ...state,
-        players: state.players.map(p =>
-          p.id === action.playerId
-            ? { ...p, nightPrompt: null, nightSubmission: null }
-            : p
-        ),
-      };
-    }
-
     case "ADD_REMINDER": {
       if (action.storytellerId !== state.storytellerId) return state;
       const token = action.token.trim();
@@ -797,7 +749,7 @@ export function redactStateFor(state: GameState, recipientId: string | null): Ga
     ...state,
     players: state.players.map(p => {
       if (recipient && p.id === recipient.id) {
-        // Le joueur lui-même : voit son rôle, son roleInfo, sa nightPrompt et sa propre soumission.
+        // Le joueur lui-même : voit son rôle et son roleInfo.
         // Mais il ne sait pas s'il est empoisonné ni quels reminders sont sur lui (info GM-only).
         return { ...p, poisoned: false, reminders: [] };
       }
@@ -808,8 +760,6 @@ export function redactStateFor(state: GameState, recipientId: string | null): Ga
         displayRole: null,
         roleInfo: [],
         poisoned: false,
-        nightPrompt: null,
-        nightSubmission: null,
         reminders: [],
       };
     }),

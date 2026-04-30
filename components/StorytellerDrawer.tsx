@@ -135,63 +135,6 @@ export function StorytellerDrawer({
               onSelect={roleId => dispatch({ type: "SET_PLAYER_ROLE", storytellerId: meId, playerId: selected.id, roleId })}
             />
 
-            <div className="mt-3 pt-3 border-t border-stone-700">
-              <div className="text-stone-400 text-xs uppercase tracking-wider mb-2">Demande de nuit</div>
-              {selected.nightPrompt ? (
-                <div className="bg-indigo-950/40 ring-1 ring-indigo-800 p-2 mb-2">
-                  <div className="text-xs text-indigo-200">{selected.nightPrompt.label}</div>
-                  {selected.nightSubmission ? (
-                    <div className="mt-1 text-xs text-emerald-300">
-                      Réponse :{" "}
-                      {selected.nightSubmission.targetIds.length === 0
-                        ? "(reçu)"
-                        : selected.nightSubmission.targetIds
-                            .map(id => game.players.find(p => p.id === id)?.name ?? "?")
-                            .join(", ")}
-                    </div>
-                  ) : (
-                    <div className="mt-1 text-xs text-stone-500 italic">en attente…</div>
-                  )}
-                  <button
-                    onClick={() => dispatch({ type: "CLEAR_NIGHT_PROMPT", storytellerId: meId, playerId: selected.id })}
-                    className="text-indigo-400 text-xs underline mt-1"
-                  >
-                    Effacer
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-1.5">
-                  <button
-                    onClick={() => dispatch({
-                      type: "SET_NIGHT_PROMPT", storytellerId: meId, playerId: selected.id,
-                      prompt: { kind: "pick", min: 1, max: 1, label: "Choisis 1 joueur." },
-                    })}
-                    className="p-2 ring-1 ring-stone-700 bg-stone-800 hover:bg-stone-700 text-stone-200 text-xs uppercase tracking-wide"
-                  >
-                    Choisir 1
-                  </button>
-                  <button
-                    onClick={() => dispatch({
-                      type: "SET_NIGHT_PROMPT", storytellerId: meId, playerId: selected.id,
-                      prompt: { kind: "pick", min: 2, max: 2, label: "Choisis 2 joueurs." },
-                    })}
-                    className="p-2 ring-1 ring-stone-700 bg-stone-800 hover:bg-stone-700 text-stone-200 text-xs uppercase tracking-wide"
-                  >
-                    Choisir 2
-                  </button>
-                  <button
-                    onClick={() => dispatch({
-                      type: "SET_NIGHT_PROMPT", storytellerId: meId, playerId: selected.id,
-                      prompt: { kind: "ack", label: "Réveille-toi : prends connaissance de tes infos." },
-                    })}
-                    className="col-span-2 p-2 ring-1 ring-stone-700 bg-stone-800 hover:bg-stone-700 text-stone-200 text-xs uppercase tracking-wide"
-                  >
-                    Réveiller (ack)
-                  </button>
-                </div>
-              )}
-            </div>
-
             {selected.role && script.roles[selected.role]?.team === "traveler" && selected.alive && (
               <button
                 onClick={() => dispatch({ type: "EXILE_TRAVELER", storytellerId: meId, playerId: selected.id })}

@@ -15,16 +15,6 @@ export type RoleInfoEntry =
 
 // ─── Player ────────────────────────────────────────────────────────────────
 
-// Demande envoyée par le Conteur à un joueur pendant la nuit (ou le jour pour Slayer).
-export type NightPrompt =
-  | { kind: "pick"; min: number; max: number; label: string }
-  | { kind: "ack"; label: string };
-
-export interface NightSubmission {
-  targetIds: string[];
-  at: number;
-}
-
 // Reminder tokens posés par le Conteur près d'un joueur (info GM-only).
 // Liste libre + presets dans data/reminders.ts.
 export type ReminderToken = string; // ex: "drunk", "protected", "mad", "used", "red-herring", "master"
@@ -39,8 +29,6 @@ export interface Player {
   poisoned: boolean;
   ghostVoteUsed: boolean;       // un mort dispose d'un seul vote (vote fantôme), épuisé une fois utilisé
   roleInfo: RoleInfoEntry[];    // infos de rôle (bluffs démon, infos lavandière, etc.)
-  nightPrompt: NightPrompt | null;     // demande active du Conteur
-  nightSubmission: NightSubmission | null; // réponse du joueur à la demande active
   reminders: ReminderToken[];   // GM-only — redacté pour tous les non-GM
   slayerUsed: boolean;          // capacité Slayer déjà consommée
 }
@@ -127,9 +115,6 @@ export type GameAction =
   | { type: "RESOLVE_NOMINATION"; storytellerId: string; execute: boolean }
   | { type: "SET_ROLE_INFO"; storytellerId: string; playerId: string; roleInfo: RoleInfoEntry[] }
   | { type: "SET_PLAYER_ROLE"; storytellerId: string; playerId: string; roleId: string }
-  | { type: "SET_NIGHT_PROMPT"; storytellerId: string; playerId: string; prompt: NightPrompt | null }
-  | { type: "SUBMIT_NIGHT_PROMPT"; playerId: string; targetIds: string[] }
-  | { type: "CLEAR_NIGHT_PROMPT"; storytellerId: string; playerId: string }
   | { type: "ADD_REMINDER"; storytellerId: string; playerId: string; token: ReminderToken }
   | { type: "REMOVE_REMINDER"; storytellerId: string; playerId: string; index: number }
   | { type: "TOGGLE_NIGHT_DONE"; storytellerId: string; playerId: string }

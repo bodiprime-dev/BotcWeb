@@ -8,7 +8,6 @@ import { RoleIcon } from "./RoleIcon";
 import { RoleInfoDisplay } from "./RoleInfoDisplay";
 import { ScriptReference } from "./ScriptReference";
 import { VictoryBanner } from "./VictoryBanner";
-import { NightPromptModal } from "./NightPromptModal";
 import { ChatPanel } from "./ChatPanel";
 
 export function PlayerView({
@@ -35,7 +34,6 @@ export function PlayerView({
   return (
     <div className="min-h-screen p-6">
       {showScript && <ScriptReference scriptId={game.scriptId} onClose={() => setShowScript(false)} />}
-      <NightPromptModal game={game} me={me} dispatch={dispatch} />
       <ChatPanel game={game} me={me} dispatch={dispatch} />
 
 
