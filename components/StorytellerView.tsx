@@ -122,6 +122,8 @@ export function StorytellerView({
           selectedId={selectedId}
           onSelectPlayer={setSelectedId}
           panelOpen={panelOpen}
+          storytellerId={me.id}
+          dispatch={dispatch}
         />
       </div>
 
