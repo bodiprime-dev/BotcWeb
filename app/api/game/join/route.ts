@@ -17,8 +17,9 @@ export async function POST(req: NextRequest) {
   }
 
   const newPlayer = updated.players[updated.players.length - 1];
+  const secret = updated.secrets[newPlayer.id];
   await saveGame(updated);
-  await pusherServer.trigger(channelName(code), "state-update", { state: updated });
+  await pusherServer.trigger(channelName(code), "state-changed", { at: Date.now() });
 
-  return NextResponse.json({ playerId: newPlayer.id });
+  return NextResponse.json({ playerId: newPlayer.id, secret });
 }

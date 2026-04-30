@@ -1,5 +1,5 @@
 import { nanoid } from "nanoid";
-import type { GameState, GameAction, Player, PlayerView, RoleInfoEntry } from "./types";
+import type { GameState, GameAction, Player, PlayerView, RoleInfoEntry, NominationRecord, ChatMessage } from "./types";
 import { SCRIPTS, type Script } from "@/data/scripts";
 
 // Répartition officielle Blood on the Clocktower par nombre de joueurs
@@ -30,8 +30,121 @@ export function createNewGame(scriptId: string): GameState {
     startedAt: null,
     selectedRoleIds: [],
     nominee: null,
+    nominator: null,
     votes: {},
+    nominationsToday: [],
+    nightDone: [],
+    chat: [],
+    winner: null,
+    winReason: null,
+    secrets: {},
   };
+}
+
+// Seuil pour qu'une nomination passe : majorité (≥ ceil(N/2)) des joueurs vivants.
+export function executionThreshold(state: GameState): number {
+  const living = state.players.filter(p => !p.isStoryteller && p.alive).length;
+  return Math.ceil(living / 2);
+}
+
+// Détection de victoire — appelée après chaque mort / fin de jour.
+// Renvoie null si la partie continue.
+// Règles :
+// - Mauvais : ≤ 2 joueurs vivants (le Démon ne peut plus perdre par exécution)
+// - Mauvais : un Saint a été exécuté
+// - Bons   : aucun Démon vivant (et pas de Scarlet Woman pour reprendre)
+// - Bons   : le Maire est vivant à 3 joueurs et aucune exécution n'a eu lieu ce jour
+export function checkVictory(
+  state: GameState,
+  ctx?: { saintExecuted?: boolean; dayJustEnded?: boolean }
+): { winner: "good" | "evil"; reason: string } | null {
+  if (state.winner !== null) return null;
+  if (state.phase === "lobby") return null;
+
+  const script = SCRIPTS[state.scriptId];
+  if (!script) return null;
+
+  if (ctx?.saintExecuted) {
+    return { winner: "evil", reason: "Un Saint a été exécuté." };
+  }
+
+  // Les Voyageurs ne comptent ni dans le décompte minimum ni pour la victoire des Bons.
+  const playable = state.players.filter(p =>
+    !p.isStoryteller && (!p.role || script.roles[p.role]?.team !== "traveler")
+  );
+  const living = playable.filter(p => p.alive);
+
+  if (living.length <= 2) {
+    return { winner: "evil", reason: "Il ne reste plus que 2 joueurs vivants ou moins." };
+  }
+
+  // Aucun Démon vivant (et pas de Scarlet Woman pour devenir Démon)
+  const livingDemon = living.some(p => p.role && script.roles[p.role]?.team === "demon");
+  if (!livingDemon) {
+    const livingSW = living.some(p => p.role === "scarletwoman");
+    if (!livingSW) {
+      return { winner: "good", reason: "Le Démon est mort." };
+    }
+  }
+
+  // Mayor : 3 joueurs vivants à la fin du jour, sans exécution aujourd'hui
+  if (ctx?.dayJustEnded) {
+    const mayorAlive = living.some(p => p.role === "mayor");
+    const noExecutionToday = !state.nominationsToday.some(n => n.executed);
+    if (mayorAlive && living.length === 3 && noExecutionToday) {
+      return { winner: "good", reason: "Le Maire l'emporte (3 vivants, pas d'exécution)." };
+    }
+  }
+
+  return null;
+}
+
+function withVictoryCheck(
+  state: GameState,
+  ctx?: { saintExecuted?: boolean; dayJustEnded?: boolean }
+): GameState {
+  const v = checkVictory(state, ctx);
+  if (!v) return state;
+  return { ...state, winner: v.winner, winReason: v.reason };
+}
+
+// Si le Démon meurt à 5 vivants ou + ET qu'une Scarlet Woman est en vie,
+// elle prend la place du Démon (rôle, displayRole) et reçoit une note privée.
+function withScarletPromotion(state: GameState): GameState {
+  if (state.winner) return state;
+  if (state.phase === "lobby") return state;
+  const script = SCRIPTS[state.scriptId];
+  if (!script) return state;
+  const playable = state.players.filter(p => !p.isStoryteller);
+  const living = playable.filter(p => p.alive);
+  if (living.length < 5) return state;
+  const livingDemonExists = living.some(p => p.role && script.roles[p.role]?.team === "demon");
+  if (livingDemonExists) return state;
+  const sw = living.find(p => p.role === "scarletwoman");
+  if (!sw) return state;
+  const deadDemon = playable.find(p => !p.alive && p.role && script.roles[p.role]?.team === "demon");
+  if (!deadDemon || !deadDemon.role) return state;
+  const newRole = deadDemon.role;
+  return {
+    ...state,
+    players: state.players.map(p =>
+      p.id === sw.id
+        ? {
+            ...p,
+            role: newRole,
+            displayRole: newRole,
+            roleInfo: [
+              ...p.roleInfo,
+              { kind: "text", content: `Le Démon est mort. Tu es maintenant ${script.roles[newRole]?.name ?? newRole}.` },
+            ],
+          }
+        : p
+    ),
+  };
+}
+
+function afterDeath(state: GameState, ctx?: { saintExecuted?: boolean }): GameState {
+  return withVictoryCheck(withScarletPromotion(state), ctx);
 }
 
 export function generateCode(): string {
@@ -199,9 +312,19 @@ export function applyAction(state: GameState, action: GameAction): GameState {
         alive: true,
         isStoryteller: false,
         poisoned: false,
+        ghostVoteUsed: false,
         roleInfo: [],
+        nightPrompt: null,
+        nightSubmission: null,
+        reminders: [],
+        slayerUsed: false,
       };
-      return { ...state, players: [...state.players, player] };
+      const secret = nanoid(24);
+      return {
+        ...state,
+        players: [...state.players, player],
+        secrets: { ...state.secrets, [player.id]: secret },
+      };
     }
 
     case "REMOVE_PLAYER": {
@@ -236,17 +359,37 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       if (action.selectedRoleIds.length >= playerCount) {
         assignedRoles = shuffle(action.selectedRoleIds).slice(0, playerCount);
       } else {
-        const dist = ROLE_DISTRIBUTION[playerCount] ?? ROLE_DISTRIBUTION[15];
-        const byTeam: Record<string, string[]> = { townsfolk: [], outsider: [], minion: [], demon: [] };
+        // Au-delà de 15 joueurs, les surnuméraires sont des Voyageurs.
+        // On garde la distribution standard pour les 15 premiers.
+        const standardCount = Math.min(playerCount, 15);
+        const travelerCount = Math.max(0, playerCount - 15);
+        const baseDist = ROLE_DISTRIBUTION[standardCount] ?? ROLE_DISTRIBUTION[15];
+        const byTeam: Record<string, string[]> = { townsfolk: [], outsider: [], minion: [], demon: [], traveler: [] };
         for (const [id, role] of Object.entries(script.roles)) {
           byTeam[role.team]?.push(id);
         }
-        assignedRoles = shuffle([
-          ...shuffle(byTeam.townsfolk).slice(0, dist.townsfolk),
-          ...shuffle(byTeam.outsider).slice(0, dist.outsiders),
-          ...shuffle(byTeam.minion).slice(0, dist.minions),
-          ...shuffle(byTeam.demon).slice(0, dist.demons),
-        ]);
+        // Au-delà de 15 sans Voyageur dans le script, on refuse le démarrage.
+        if (travelerCount > 0 && byTeam.traveler.length === 0) return state;
+        // 1) On tire d'abord les minions et démon, puis on regarde si un setup-modifier
+        //    impose un ajustement (Baron : +2 Outsiders / -2 Townsfolk).
+        const minions = shuffle(byTeam.minion).slice(0, baseDist.minions);
+        const demons = shuffle(byTeam.demon).slice(0, baseDist.demons);
+        let outsiderCount = baseDist.outsiders;
+        let townsfolkCount = baseDist.townsfolk;
+        if (minions.includes("baron")) {
+          const shift = Math.min(2, townsfolkCount, byTeam.outsider.length - outsiderCount);
+          outsiderCount += shift;
+          townsfolkCount -= shift;
+        }
+        const outsiders = shuffle(byTeam.outsider).slice(0, outsiderCount);
+        const townsfolk = shuffle(byTeam.townsfolk).slice(0, townsfolkCount);
+        // Voyageurs : tirage avec remise si la liste est plus courte que travelerCount
+        const travelers: string[] = [];
+        for (let i = 0; i < travelerCount; i++) {
+          const pool = byTeam.traveler;
+          travelers.push(pool[Math.floor(Math.random() * pool.length)]);
+        }
+        assignedRoles = shuffle([...townsfolk, ...outsiders, ...minions, ...demons, ...travelers]);
       }
 
       // Passe 1 : assigner les rôles (sans roleInfo encore)
@@ -307,15 +450,23 @@ export function applyAction(state: GameState, action: GameAction): GameState {
 
     case "TOGGLE_ALIVE": {
       if (action.storytellerId !== state.storytellerId) return state;
-      return {
+      const target = state.players.find(p => p.id === action.playerId);
+      const wasAlive = !!target?.alive;
+      const players = state.players.map(p =>
+        p.id === action.playerId
+          ? { ...p, alive: !p.alive, poisoned: p.alive ? false : p.poisoned }
+          : p
+      );
+      const closeOpenVote =
+        state.nominee === action.playerId || state.nominator === action.playerId;
+      const next: GameState = {
         ...state,
-        players: state.players.map(p =>
-          p.id === action.playerId
-            ? { ...p, alive: !p.alive, poisoned: p.alive ? false : p.poisoned }
-            : p
-        ),
-        nominee: state.nominee === action.playerId ? null : state.nominee,
+        players,
+        nominee: closeOpenVote ? null : state.nominee,
+        nominator: closeOpenVote ? null : state.nominator,
+        votes: closeOpenVote ? {} : state.votes,
       };
+      return wasAlive ? afterDeath(next) : next;
     }
 
     case "TOGGLE_POISON": {
@@ -330,28 +481,101 @@ export function applyAction(state: GameState, action: GameAction): GameState {
 
     case "SET_NOMINEE": {
       if (action.storytellerId !== state.storytellerId) return state;
-      return { ...state, nominee: action.playerId, votes: {} };
+      return { ...state, nominee: action.playerId, nominator: null, votes: {} };
     }
 
     case "TOGGLE_PHASE": {
       if (action.storytellerId !== state.storytellerId) return state;
-      if (state.phase === "day") return { ...state, phase: "night", nominee: null, votes: {} };
-      if (state.phase === "night") return { ...state, phase: "day", day: state.day + 1 };
+      if (state.phase === "day") {
+        // jour → nuit : on vérifie d'abord la victoire du Maire AVANT de purger l'historique
+        const checked = withVictoryCheck(state, { dayJustEnded: true });
+        return {
+          ...checked,
+          phase: "night",
+          nominee: null,
+          nominator: null,
+          votes: {},
+          nominationsToday: [],
+          nightDone: [],
+        };
+      }
+      if (state.phase === "night") {
+        return { ...state, phase: "day", day: state.day + 1, nightDone: [] };
+      }
       return state;
     }
 
     case "NOMINATE": {
       if (state.phase !== "day") return state;
+      if (state.winner !== null) return state;
+      if (state.nominee !== null) return state; // une nomination en cours bloque
       const nominator = state.players.find(p => p.id === action.nominatorId);
       const nominee = state.players.find(p => p.id === action.nomineeId);
       if (!nominator || !nominee || !nominator.alive || !nominee.alive) return state;
-      if (nominator.isStoryteller) return state;
-      return { ...state, nominee: action.nomineeId, votes: {} };
+      if (nominator.isStoryteller || nominee.isStoryteller) return state;
+      // Une seule nomination par jour, par accusateur ET par accusé
+      const alreadyNominator = state.nominationsToday.some(n => n.nominatorId === nominator.id);
+      const alreadyNominee = state.nominationsToday.some(n => n.nomineeId === nominee.id);
+      if (alreadyNominator || alreadyNominee) return state;
+      return { ...state, nominee: action.nomineeId, nominator: action.nominatorId, votes: {} };
     }
 
     case "CLEAR_NOMINATION": {
       if (action.storytellerId !== state.storytellerId) return state;
-      return { ...state, nominee: null, votes: {} };
+      return { ...state, nominee: null, nominator: null, votes: {} };
+    }
+
+    case "VOTE": {
+      if (state.phase !== "day") return state;
+      if (state.winner !== null) return state;
+      if (state.nominee === null) return state;
+      const voter = state.players.find(p => p.id === action.voterId);
+      if (!voter || voter.isStoryteller) return state;
+      // Mort sans jeton fantôme : refusé. Mort avec jeton : autorisé (consommé à la résolution).
+      if (!voter.alive && voter.ghostVoteUsed) return state;
+      return { ...state, votes: { ...state.votes, [voter.id]: action.value } };
+    }
+
+    case "RESOLVE_NOMINATION": {
+      if (action.storytellerId !== state.storytellerId) return state;
+      if (state.nominee === null) return state;
+      const yesVoterIds = Object.entries(state.votes)
+        .filter(([, v]) => v === true)
+        .map(([id]) => id);
+      const record: NominationRecord = {
+        nominatorId: state.nominator ?? "",
+        nomineeId: state.nominee,
+        yesVoterIds,
+        yesCount: yesVoterIds.length,
+        executed: action.execute,
+        at: Date.now(),
+      };
+      const executedPlayer = action.execute
+        ? state.players.find(p => p.id === state.nominee)
+        : null;
+      // Brûle le jeton fantôme de chaque mort qui a voté (oui ou non)
+      const ghostBurners = new Set(
+        state.players
+          .filter(p => !p.alive && state.votes[p.id] !== undefined)
+          .map(p => p.id)
+      );
+      const players = state.players.map(p => {
+        const burned = ghostBurners.has(p.id) ? { ghostVoteUsed: true } : {};
+        if (action.execute && p.id === state.nominee) {
+          return { ...p, ...burned, alive: false, poisoned: false };
+        }
+        return ghostBurners.has(p.id) ? { ...p, ...burned } : p;
+      });
+      const next: GameState = {
+        ...state,
+        players,
+        nominee: null,
+        nominator: null,
+        votes: {},
+        nominationsToday: [...state.nominationsToday, record],
+      };
+      const saintExecuted = action.execute && executedPlayer?.role === "saint";
+      return action.execute ? afterDeath(next, { saintExecuted }) : next;
     }
 
     case "SET_ROLE_INFO": {
@@ -376,6 +600,145 @@ export function applyAction(state: GameState, action: GameAction): GameState {
             : p
         ),
       };
+    }
+
+    case "SET_NIGHT_PROMPT": {
+      if (action.storytellerId !== state.storytellerId) return state;
+      return {
+        ...state,
+        players: state.players.map(p =>
+          p.id === action.playerId
+            ? { ...p, nightPrompt: action.prompt, nightSubmission: null }
+            : p
+        ),
+      };
+    }
+
+    case "SUBMIT_NIGHT_PROMPT": {
+      const player = state.players.find(p => p.id === action.playerId);
+      if (!player || player.isStoryteller) return state;
+      if (!player.nightPrompt) return state;
+      // Validation : pour kind="pick", respecter min/max
+      if (player.nightPrompt.kind === "pick") {
+        const n = action.targetIds.length;
+        if (n < player.nightPrompt.min || n > player.nightPrompt.max) return state;
+        // Cibles doivent exister et ne pas être le Conteur
+        const validIds = new Set(state.players.filter(p => !p.isStoryteller).map(p => p.id));
+        if (!action.targetIds.every(id => validIds.has(id))) return state;
+      }
+      return {
+        ...state,
+        players: state.players.map(p =>
+          p.id === action.playerId
+            ? { ...p, nightSubmission: { targetIds: action.targetIds, at: Date.now() } }
+            : p
+        ),
+      };
+    }
+
+    case "CLEAR_NIGHT_PROMPT": {
+      if (action.storytellerId !== state.storytellerId) return state;
+      return {
+        ...state,
+        players: state.players.map(p =>
+          p.id === action.playerId
+            ? { ...p, nightPrompt: null, nightSubmission: null }
+            : p
+        ),
+      };
+    }
+
+    case "ADD_REMINDER": {
+      if (action.storytellerId !== state.storytellerId) return state;
+      const token = action.token.trim();
+      if (!token) return state;
+      return {
+        ...state,
+        players: state.players.map(p =>
+          p.id === action.playerId
+            ? { ...p, reminders: [...p.reminders, token] }
+            : p
+        ),
+      };
+    }
+
+    case "REMOVE_REMINDER": {
+      if (action.storytellerId !== state.storytellerId) return state;
+      return {
+        ...state,
+        players: state.players.map(p =>
+          p.id === action.playerId
+            ? { ...p, reminders: p.reminders.filter((_, i) => i !== action.index) }
+            : p
+        ),
+      };
+    }
+
+    case "TOGGLE_NIGHT_DONE": {
+      if (action.storytellerId !== state.storytellerId) return state;
+      const set = new Set(state.nightDone);
+      if (set.has(action.playerId)) set.delete(action.playerId);
+      else set.add(action.playerId);
+      return { ...state, nightDone: Array.from(set) };
+    }
+
+    case "EXILE_TRAVELER": {
+      if (action.storytellerId !== state.storytellerId) return state;
+      const target = state.players.find(p => p.id === action.playerId);
+      if (!target || target.isStoryteller) return state;
+      const script = SCRIPTS[state.scriptId];
+      if (!script || !target.role || script.roles[target.role]?.team !== "traveler") return state;
+      // L'exil tue le voyageur sans déclencher de fin de partie ni d'enregistrement de nomination.
+      const players = state.players.map(p =>
+        p.id === target.id ? { ...p, alive: false, poisoned: false } : p
+      );
+      return { ...state, players };
+    }
+
+    case "SEND_CHAT": {
+      const sender = state.players.find(p => p.id === action.fromId);
+      if (!sender) return state;
+      const text = action.text.trim().slice(0, 500);
+      if (!text) return state;
+      // Le destinataire doit exister (sauf "all")
+      if (action.toId !== "all" && !state.players.some(p => p.id === action.toId)) return state;
+      const msg: ChatMessage = {
+        id: nanoid(8),
+        fromId: action.fromId,
+        toId: action.toId,
+        text,
+        at: Date.now(),
+      };
+      // Cap à 200 messages pour éviter la croissance infinie
+      const chat = [...state.chat, msg].slice(-200);
+      return { ...state, chat };
+    }
+
+    case "SLAYER_SHOOT": {
+      if (state.phase !== "day") return state;
+      if (state.winner !== null) return state;
+      const shooter = state.players.find(p => p.id === action.shooterId);
+      const target = state.players.find(p => p.id === action.targetId);
+      if (!shooter || !target) return state;
+      if (shooter.isStoryteller || target.isStoryteller) return state;
+      if (!shooter.alive) return state;
+      if (shooter.slayerUsed) return state;
+      // Le joueur DOIT se croire Slayer (displayRole) ; la vraie résolution dépend du vrai rôle.
+      if (shooter.displayRole !== "slayer") return state;
+      const script = SCRIPTS[state.scriptId];
+      // Effet réel : seul un Slayer non empoisonné fait mourir un Démon.
+      const reallyKills =
+        shooter.role === "slayer" &&
+        !shooter.poisoned &&
+        target.role !== null &&
+        script?.roles[target.role]?.team === "demon";
+      const players = state.players.map(p => {
+        if (p.id === shooter.id) return { ...p, slayerUsed: true };
+        if (reallyKills && p.id === target.id) return { ...p, alive: false, poisoned: false };
+        return p;
+      });
+      const next: GameState = { ...state, players };
+      return reallyKills ? afterDeath(next) : next;
     }
 
     default:
@@ -407,5 +770,51 @@ export function getPlayerView(state: GameState, playerId: string): PlayerView | 
     others,
     storytellerId: state.storytellerId,
     nominee: state.nominee,
+  };
+}
+
+// Redaction côté serveur du GameState avant broadcast / réponse API.
+// Garde le SHAPE de GameState pour ne pas casser le client, mais efface
+// les champs sensibles selon le destinataire :
+// - GM : voit tout
+// - Joueur : voit son propre rôle, les autres ont role/displayRole/roleInfo nullifiés,
+//   et selectedRoleIds (la liste des rôles en jeu) est masquée
+// - Anonyme (avant join) : tous les rôles masqués
+export function redactStateFor(state: GameState, recipientId: string | null): GameState {
+  const recipient = recipientId ? state.players.find(p => p.id === recipientId) : null;
+  if (recipient?.isStoryteller) {
+    // Le GM voit tout sauf les secrets serveur.
+    return { ...state, secrets: {} };
+  }
+
+  // Filtre le chat : public + messages dont je suis émetteur ou destinataire.
+  const chat = state.chat.filter(m =>
+    m.toId === "all" ||
+    (recipient && (m.fromId === recipient.id || m.toId === recipient.id))
+  );
+
+  return {
+    ...state,
+    players: state.players.map(p => {
+      if (recipient && p.id === recipient.id) {
+        // Le joueur lui-même : voit son rôle, son roleInfo, sa nightPrompt et sa propre soumission.
+        // Mais il ne sait pas s'il est empoisonné ni quels reminders sont sur lui (info GM-only).
+        return { ...p, poisoned: false, reminders: [] };
+      }
+      // Autres joueurs : aucune info privée
+      return {
+        ...p,
+        role: null,
+        displayRole: null,
+        roleInfo: [],
+        poisoned: false,
+        nightPrompt: null,
+        nightSubmission: null,
+        reminders: [],
+      };
+    }),
+    selectedRoleIds: [],
+    chat,
+    secrets: {},
   };
 }

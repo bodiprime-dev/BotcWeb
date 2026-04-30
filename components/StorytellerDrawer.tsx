@@ -1,11 +1,13 @@
 "use client";
-import { BookOpen, FlaskConical, Gavel, Moon, Skull, Sparkles, X } from "lucide-react";
+import { BookOpen, Check, FlaskConical, Gavel, Moon, Skull, Sparkles, X } from "lucide-react";
 import { SCRIPTS, TEAM_COLORS, type Team } from "@/data/scripts";
 import type { GameState, GameAction, Player, RoleInfoEntry } from "@/lib/types";
+import { executionThreshold } from "@/lib/game";
 import { useNightOrder } from "@/hooks/useNightOrder";
 import { RoleIcon } from "./RoleIcon";
 import { RoleInfoEditor } from "./RoleInfoEditor";
 import { RoleChangePanel } from "./RoleChangePanel";
+import { RemindersEditor } from "./RemindersEditor";
 
 export function StorytellerDrawer({
   game,
@@ -132,6 +134,75 @@ export function StorytellerDrawer({
               scriptId={game.scriptId}
               onSelect={roleId => dispatch({ type: "SET_PLAYER_ROLE", storytellerId: meId, playerId: selected.id, roleId })}
             />
+
+            <div className="mt-3 pt-3 border-t border-stone-700">
+              <div className="text-stone-400 text-xs uppercase tracking-wider mb-2">Demande de nuit</div>
+              {selected.nightPrompt ? (
+                <div className="bg-indigo-950/40 ring-1 ring-indigo-800 p-2 mb-2">
+                  <div className="text-xs text-indigo-200">{selected.nightPrompt.label}</div>
+                  {selected.nightSubmission ? (
+                    <div className="mt-1 text-xs text-emerald-300">
+                      Réponse :{" "}
+                      {selected.nightSubmission.targetIds.length === 0
+                        ? "(reçu)"
+                        : selected.nightSubmission.targetIds
+                            .map(id => game.players.find(p => p.id === id)?.name ?? "?")
+                            .join(", ")}
+                    </div>
+                  ) : (
+                    <div className="mt-1 text-xs text-stone-500 italic">en attente…</div>
+                  )}
+                  <button
+                    onClick={() => dispatch({ type: "CLEAR_NIGHT_PROMPT", storytellerId: meId, playerId: selected.id })}
+                    className="text-indigo-400 text-xs underline mt-1"
+                  >
+                    Effacer
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    onClick={() => dispatch({
+                      type: "SET_NIGHT_PROMPT", storytellerId: meId, playerId: selected.id,
+                      prompt: { kind: "pick", min: 1, max: 1, label: "Choisis 1 joueur." },
+                    })}
+                    className="p-2 ring-1 ring-stone-700 bg-stone-800 hover:bg-stone-700 text-stone-200 text-xs uppercase tracking-wide"
+                  >
+                    Choisir 1
+                  </button>
+                  <button
+                    onClick={() => dispatch({
+                      type: "SET_NIGHT_PROMPT", storytellerId: meId, playerId: selected.id,
+                      prompt: { kind: "pick", min: 2, max: 2, label: "Choisis 2 joueurs." },
+                    })}
+                    className="p-2 ring-1 ring-stone-700 bg-stone-800 hover:bg-stone-700 text-stone-200 text-xs uppercase tracking-wide"
+                  >
+                    Choisir 2
+                  </button>
+                  <button
+                    onClick={() => dispatch({
+                      type: "SET_NIGHT_PROMPT", storytellerId: meId, playerId: selected.id,
+                      prompt: { kind: "ack", label: "Réveille-toi : prends connaissance de tes infos." },
+                    })}
+                    className="col-span-2 p-2 ring-1 ring-stone-700 bg-stone-800 hover:bg-stone-700 text-stone-200 text-xs uppercase tracking-wide"
+                  >
+                    Réveiller (ack)
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {selected.role && script.roles[selected.role]?.team === "traveler" && selected.alive && (
+              <button
+                onClick={() => dispatch({ type: "EXILE_TRAVELER", storytellerId: meId, playerId: selected.id })}
+                className="mt-3 w-full p-2 ring-1 ring-emerald-700/60 bg-emerald-950/40 hover:bg-emerald-900/40 text-emerald-200 text-xs uppercase tracking-wide"
+              >
+                Exiler ce Voyageur
+              </button>
+            )}
+
+            <RemindersEditor player={selected} storytellerId={meId} dispatch={dispatch} />
+
             <RoleInfoEditor
               player={selected}
               allPlayers={game.players}
@@ -146,20 +217,100 @@ export function StorytellerDrawer({
           </div>
         )}
 
-        {game.nominee && (
-          <div className="bg-orange-950/50 ring-1 ring-orange-800 p-3">
-            <div className="text-orange-300 text-xs uppercase tracking-wider mb-1 flex items-center gap-1.5">
-              <Gavel className="w-3 h-3" /> Nomination en cours
+        {game.nominee && (() => {
+          const nomineeP = game.players.find(p => p.id === game.nominee);
+          const nominatorP = game.nominator ? game.players.find(p => p.id === game.nominator) : null;
+          const yesVoters = game.players.filter(p => game.votes[p.id] === true);
+          const noVoters = game.players.filter(p => game.votes[p.id] === false);
+          const yesCount = yesVoters.length;
+          const threshold = executionThreshold(game);
+          const reaches = yesCount >= threshold;
+          const livingNonGM = game.players.filter(p => !p.isStoryteller && p.alive);
+          const pending = livingNonGM.filter(p => game.votes[p.id] === undefined);
+          return (
+            <div className="bg-orange-950/50 ring-1 ring-orange-800 p-3">
+              <div className="text-orange-300 text-xs uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <Gavel className="w-3 h-3" /> Nomination en cours
+              </div>
+              <div className="text-stone-100 mb-2">
+                {nominatorP ? <span className="text-stone-400">{nominatorP.name} → </span> : null}
+                <span className="font-medium">{nomineeP?.name}</span>
+              </div>
+              <div className="flex items-baseline gap-2 mb-3">
+                <span className={`text-2xl font-bold ${reaches ? "text-amber-300" : "text-stone-300"}`}>{yesCount}</span>
+                <span className="text-stone-500 text-xs">/ {threshold} oui requis</span>
+                {pending.length > 0 && (
+                  <span className="text-stone-500 text-xs ml-auto">{pending.length} en attente</span>
+                )}
+              </div>
+              {(yesVoters.length > 0 || noVoters.length > 0) && (
+                <div className="space-y-1 mb-3 text-xs">
+                  {yesVoters.length > 0 && (
+                    <div className="flex items-start gap-1.5">
+                      <Check className="w-3 h-3 text-amber-400 mt-0.5 flex-shrink-0" />
+                      <span className="text-stone-300">{yesVoters.map(p => p.name).join(", ")}</span>
+                    </div>
+                  )}
+                  {noVoters.length > 0 && (
+                    <div className="flex items-start gap-1.5">
+                      <X className="w-3 h-3 text-stone-500 mt-0.5 flex-shrink-0" />
+                      <span className="text-stone-500">{noVoters.map(p => p.name).join(", ")}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => dispatch({ type: "RESOLVE_NOMINATION", storytellerId: meId, execute: true })}
+                  disabled={!reaches}
+                  className={`p-2 ring-1 text-xs uppercase tracking-wide transition-all ${
+                    reaches
+                      ? "bg-red-900 ring-red-700 text-red-100 hover:bg-red-800"
+                      : "bg-stone-900 ring-stone-700 text-stone-600 cursor-not-allowed"
+                  }`}
+                >
+                  Exécuter
+                </button>
+                <button
+                  onClick={() => dispatch({ type: "RESOLVE_NOMINATION", storytellerId: meId, execute: false })}
+                  className="p-2 ring-1 ring-stone-700 bg-stone-800 hover:bg-stone-700 text-stone-200 text-xs uppercase tracking-wide"
+                >
+                  Clore (sans exéc.)
+                </button>
+              </div>
+              <button
+                onClick={() => dispatch({ type: "CLEAR_NOMINATION", storytellerId: meId })}
+                className="text-orange-400/80 text-xs underline mt-2 block"
+              >
+                Annuler la nomination
+              </button>
             </div>
-            <div className="text-stone-100 font-medium">
-              {game.players.find(p => p.id === game.nominee)?.name}
+          );
+        })()}
+
+        {game.nominationsToday.length > 0 && (
+          <div className="bg-stone-900 ring-1 ring-stone-700 p-3">
+            <div className="text-stone-400 text-xs uppercase tracking-wider mb-2">
+              Nominations du jour {game.day}
             </div>
-            <button
-              onClick={() => dispatch({ type: "CLEAR_NOMINATION", storytellerId: meId })}
-              className="text-orange-400 text-xs underline mt-1"
-            >
-              Annuler
-            </button>
+            <ol className="space-y-1">
+              {game.nominationsToday.map((n, i) => {
+                const nor = game.players.find(p => p.id === n.nominatorId);
+                const nee = game.players.find(p => p.id === n.nomineeId);
+                return (
+                  <li key={i} className="flex items-center gap-2 text-xs">
+                    <span className="text-stone-600 w-4">{i + 1}.</span>
+                    <span className="text-stone-400">{nor?.name ?? "?"}</span>
+                    <span className="text-stone-600">→</span>
+                    <span className={n.executed ? "text-red-300 line-through" : "text-stone-200"}>
+                      {nee?.name ?? "?"}
+                    </span>
+                    <span className="ml-auto text-stone-500">{n.yesCount} oui</span>
+                    {n.executed && <Skull className="w-3 h-3 text-red-400" />}
+                  </li>
+                );
+              })}
+            </ol>
           </div>
         )}
 
@@ -175,14 +326,26 @@ export function StorytellerDrawer({
                 {nightOrder.map(({ player, realRole }, i) => {
                   const tc = TEAM_COLORS[realRole.team as Team];
                   const isDrunk = player.role === "drunk";
+                  const done = game.nightDone.includes(player.id);
                   return (
-                    <li key={player.id} className="flex items-center gap-2">
-                      <span className={`w-5 h-5 rounded-full ${tc.accent} text-stone-50 text-[10px] font-bold flex items-center justify-center flex-shrink-0`}>
-                        {i + 1}
-                      </span>
+                    <li
+                      key={player.id}
+                      className={`flex items-center gap-2 transition-opacity ${done ? "opacity-40" : ""}`}
+                    >
+                      <button
+                        onClick={() => dispatch({ type: "TOGGLE_NIGHT_DONE", storytellerId: meId, playerId: player.id })}
+                        aria-label={done ? "Marquer non fait" : "Marquer fait"}
+                        className={`w-5 h-5 ring-1 flex items-center justify-center flex-shrink-0 transition-all ${
+                          done
+                            ? "bg-emerald-700 ring-emerald-500 text-emerald-50"
+                            : "bg-stone-800 ring-stone-600 hover:bg-stone-700 text-stone-400"
+                        }`}
+                      >
+                        {done ? <Check className="w-3 h-3" /> : <span className="text-[10px] font-bold">{i + 1}</span>}
+                      </button>
                       <RoleIcon roleId={player.role!} size={24} className="flex-shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <div className={`text-xs font-medium ${tc.text}`}>
+                        <div className={`text-xs font-medium ${tc.text} ${done ? "line-through" : ""}`}>
                           {realRole.name}{isDrunk ? " 🍺" : ""}
                         </div>
                         <div className="text-stone-400 text-xs">{player.name}</div>

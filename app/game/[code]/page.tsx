@@ -16,35 +16,43 @@ export default function GamePage() {
 
   const [game, setGame] = useState<GameState | null>(null);
   const [playerId, setPlayerId] = useState<string | null>(null);
+  const [secret, setSecret] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const stored = typeof window !== "undefined" ? localStorage.getItem(`bot:${code}`) : null;
-    if (stored) setPlayerId(stored);
+    if (typeof window === "undefined") return;
+    const storedId = localStorage.getItem(`bot:${code}`);
+    const storedSecret = localStorage.getItem(`bot:${code}:secret`);
+    if (storedId) setPlayerId(storedId);
+    if (storedSecret) setSecret(storedSecret);
   }, [code]);
 
   useEffect(() => {
     let mounted = true;
     const pusher = getPusherClient();
     const channel = pusher.subscribe(channelName(code));
-    channel.bind("state-update", (data: { state: GameState }) => {
-      if (mounted) setGame(data.state);
-    });
-    fetch(`/api/game/${code}`)
-      .then(res => {
-        if (res.status === 404) throw new Error("Partie introuvable");
-        return res.json();
-      })
-      .then(data => { if (mounted && data.state) setGame(data.state); })
-      .catch(e => { if (mounted) setError(e.message); });
+    const refetch = () => {
+      const url = playerId
+        ? `/api/game/${code}?playerId=${encodeURIComponent(playerId)}`
+        : `/api/game/${code}`;
+      fetch(url)
+        .then(res => {
+          if (res.status === 404) throw new Error("Partie introuvable");
+          return res.json();
+        })
+        .then(data => { if (mounted && data.state) setGame(data.state); })
+        .catch(e => { if (mounted) setError(e.message); });
+    };
+    channel.bind("state-changed", refetch);
+    refetch();
     return () => {
       mounted = false;
       channel.unbind_all();
       pusher.unsubscribe(channelName(code));
     };
-  }, [code]);
+  }, [code, playerId]);
 
   async function handleJoin() {
     if (!name.trim()) return;
@@ -58,7 +66,9 @@ export default function GamePage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erreur");
       localStorage.setItem(`bot:${code}`, data.playerId);
+      if (data.secret) localStorage.setItem(`bot:${code}:secret`, data.secret);
       setPlayerId(data.playerId);
+      if (data.secret) setSecret(data.secret);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Erreur");
     } finally {
@@ -67,10 +77,11 @@ export default function GamePage() {
   }
 
   async function dispatch(action: GameAction) {
+    if (!playerId || !secret) return;
     await fetch("/api/game/action", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code, action }),
+      body: JSON.stringify({ code, playerId, secret, action }),
     });
   }
 

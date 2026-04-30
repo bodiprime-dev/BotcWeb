@@ -6,6 +6,8 @@ import { Grimoire } from "./Grimoire";
 import { StorytellerDrawer } from "./StorytellerDrawer";
 import { ScriptReference } from "./ScriptReference";
 import { RoleRevealModal } from "./RoleRevealModal";
+import { VictoryBanner } from "./VictoryBanner";
+import { ChatPanel } from "./ChatPanel";
 
 export function StorytellerView({
   game,
@@ -107,6 +109,8 @@ export function StorytellerView({
         </div>
       </div>
 
+      <VictoryBanner game={game} />
+
       <div className="max-w-7xl w-full mx-auto flex-1 flex flex-col items-center justify-center">
         <div className="text-center mb-3">
           <div className="inline-flex items-center gap-2 text-stone-400 text-xs tracking-[0.3em] uppercase">
@@ -137,6 +141,8 @@ export function StorytellerView({
         onClose={closePanel}
         meId={me.id}
       />
+
+      <ChatPanel game={game} me={me} dispatch={dispatch} />
     </div>
   );
 }

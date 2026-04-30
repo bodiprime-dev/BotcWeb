@@ -1,11 +1,15 @@
 "use client";
 import { useState } from "react";
-import { ArrowLeft, BookOpen, Eye, EyeOff, Gavel, Moon, Skull, Sun, Users } from "lucide-react";
+import { ArrowLeft, BookOpen, Check, Eye, EyeOff, Gavel, Moon, Skull, Sun, Users, X } from "lucide-react";
 import { SCRIPTS, TEAM_COLORS, type Team } from "@/data/scripts";
 import type { GameState, GameAction, Player } from "@/lib/types";
+import { executionThreshold } from "@/lib/game";
 import { RoleIcon } from "./RoleIcon";
 import { RoleInfoDisplay } from "./RoleInfoDisplay";
 import { ScriptReference } from "./ScriptReference";
+import { VictoryBanner } from "./VictoryBanner";
+import { NightPromptModal } from "./NightPromptModal";
+import { ChatPanel } from "./ChatPanel";
 
 export function PlayerView({
   game,
@@ -31,6 +35,9 @@ export function PlayerView({
   return (
     <div className="min-h-screen p-6">
       {showScript && <ScriptReference scriptId={game.scriptId} onClose={() => setShowScript(false)} />}
+      <NightPromptModal game={game} me={me} dispatch={dispatch} />
+      <ChatPanel game={game} me={me} dispatch={dispatch} />
+
 
       <div className="flex items-center justify-between mb-6 max-w-3xl mx-auto">
         {onLeave ? (
@@ -48,6 +55,8 @@ export function PlayerView({
           <div className="text-stone-500 text-xs tracking-[0.3em]">{game.code}</div>
         )}
       </div>
+
+      <VictoryBanner game={game} />
 
       <div className="max-w-3xl mx-auto">
         <div className="bg-stone-900/90 text-stone-100 p-8 ring-1 ring-amber-900/40 mb-4">
@@ -99,6 +108,14 @@ export function PlayerView({
           </div>
         </div>
 
+        {me.displayRole === "slayer" && me.alive && game.phase === "day" && !game.winner && (
+          <SlayerPanel
+            game={game}
+            me={me}
+            dispatch={dispatch}
+          />
+        )}
+
         <button
           onClick={() => setShowScript(true)}
           className="w-full flex items-center justify-center gap-2 p-3 mb-6 bg-stone-900 ring-1 ring-stone-700 text-stone-400 hover:text-stone-200 hover:ring-stone-500 text-xs uppercase tracking-[0.2em] transition-all"
@@ -134,23 +151,124 @@ export function PlayerView({
           </div>
         </div>
 
-        {game.nominee && (
-          <div className="bg-orange-950/40 ring-1 ring-orange-800 p-4 text-center">
-            <Gavel className="w-4 h-4 inline mr-2 text-orange-300" />
-            <span className="text-stone-200 text-sm">
-              Nomination :{" "}
-              <span className="text-orange-300 font-bold">
-                {game.players.find(p => p.id === game.nominee)?.name}
-              </span>
-            </span>
-          </div>
-        )}
+        {game.nominee && (() => {
+          const nomineeP = game.players.find(p => p.id === game.nominee);
+          const nominatorP = game.nominator ? game.players.find(p => p.id === game.nominator) : null;
+          const yesCount = Object.values(game.votes).filter(v => v === true).length;
+          const threshold = executionThreshold(game);
+          const myVote = game.votes[me.id];
+          const hasGhostVote = !me.alive && !me.ghostVoteUsed;
+          const canVote = !me.isStoryteller && game.phase === "day" && (me.alive || hasGhostVote);
+          return (
+            <div className="bg-orange-950/40 ring-1 ring-orange-800 p-4 mb-3">
+              <div className="text-center mb-3">
+                <Gavel className="w-4 h-4 inline mr-2 text-orange-300" />
+                <span className="text-stone-200 text-sm">
+                  {nominatorP ? <><span className="text-orange-200">{nominatorP.name}</span> nomine </> : "Nomination : "}
+                  <span className="text-orange-300 font-bold">{nomineeP?.name}</span>
+                </span>
+              </div>
+              <div className="text-center text-xs text-stone-400 mb-3">
+                <span className={yesCount >= threshold ? "text-amber-300 font-bold" : "text-stone-300"}>
+                  {yesCount}
+                </span>
+                <span className="text-stone-500"> / {threshold} oui requis</span>
+              </div>
+              {hasGhostVote && (
+                <div className="text-center text-[11px] text-purple-300 mb-2 italic">
+                  Vote fantôme : ce vote consommera ton unique jeton de mort.
+                </div>
+              )}
+              {canVote && (
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => dispatch({ type: "VOTE", voterId: me.id, value: true })}
+                    className={`p-3 ring-1 text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-all ${
+                      myVote === true
+                        ? "bg-amber-900 ring-amber-600 text-amber-100"
+                        : "bg-stone-900 ring-stone-700 text-stone-300 hover:ring-amber-700/60"
+                    }`}
+                  >
+                    <Check className="w-4 h-4" /> Oui
+                  </button>
+                  <button
+                    onClick={() => dispatch({ type: "VOTE", voterId: me.id, value: false })}
+                    className={`p-3 ring-1 text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-all ${
+                      myVote === false
+                        ? "bg-stone-700 ring-stone-500 text-stone-100"
+                        : "bg-stone-900 ring-stone-700 text-stone-300 hover:ring-stone-500"
+                    }`}
+                  >
+                    <X className="w-4 h-4" /> Non
+                  </button>
+                </div>
+              )}
+              {!canVote && me.alive && (
+                <div className="text-center text-xs text-stone-500 italic">Vote impossible (Conteur)</div>
+              )}
+              {!canVote && !me.alive && me.ghostVoteUsed && (
+                <div className="text-center text-xs text-stone-500 italic">Tu as déjà utilisé ton vote fantôme.</div>
+              )}
+            </div>
+          );
+        })()}
         {game.phase === "night" && !game.nominee && (
           <div className="bg-indigo-950/40 ring-1 ring-indigo-800/40 p-4 text-center text-indigo-100/80 text-sm italic">
             La nuit tombe. Ferme les yeux et attends le Conteur…
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function SlayerPanel({
+  game,
+  me,
+  dispatch,
+}: {
+  game: GameState;
+  me: Player;
+  dispatch: (action: GameAction) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const targets = game.players.filter(p => !p.isStoryteller && p.id !== me.id && p.alive);
+
+  if (me.slayerUsed) {
+    return (
+      <div className="bg-stone-900/60 ring-1 ring-stone-700 p-3 mb-4 text-center text-xs text-stone-500 italic">
+        Capacité de Slayer déjà utilisée.
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-red-950/30 ring-1 ring-red-900/40 p-3 mb-4">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-red-300 text-xs uppercase tracking-wider">Capacité Slayer (1×/partie)</span>
+        <button
+          onClick={() => setOpen(o => !o)}
+          className="text-red-200 text-xs underline"
+        >
+          {open ? "Annuler" : "Tirer"}
+        </button>
+      </div>
+      {open && (
+        <div className="grid grid-cols-3 gap-2">
+          {targets.map(p => (
+            <button
+              key={p.id}
+              onClick={() => {
+                dispatch({ type: "SLAYER_SHOOT", shooterId: me.id, targetId: p.id });
+                setOpen(false);
+              }}
+              className="p-2 bg-stone-900 ring-1 ring-stone-700 hover:ring-red-700 text-stone-200 text-sm"
+            >
+              {p.name}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
