@@ -95,9 +95,9 @@ export function StorytellerDrawer({
                 }`}
               >
                 {selected.alive
-                  ? <Sparkles className="w-4 h-4 text-amber-400" />
-                  : <Skull className="w-4 h-4 text-stone-400" />}
-                {selected.alive ? "Tuer" : "Vivant"}
+                  ? <Skull className="w-4 h-4 text-stone-300" />
+                  : <Sparkles className="w-4 h-4 text-amber-400" />}
+                {selected.alive ? "Tuer" : "Ressusciter"}
               </button>
               <button
                 onClick={() => selected.alive && dispatch({ type: "TOGGLE_POISON", playerId: selected.id, storytellerId: meId })}

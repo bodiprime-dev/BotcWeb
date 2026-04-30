@@ -48,7 +48,11 @@ export function NightWalkthrough({
 }) {
   const order = useNightOrder(game);
   const steps = useMemo(() => buildSteps(game, order), [game, order]);
-  const [index, setIndex] = useState(0);
+  // Reprend à la première étape non encore marquée "fait" dans nightDone.
+  const [index, setIndex] = useState(() => {
+    const firstUndone = steps.findIndex(s => !game.nightDone.includes(s.entry.player.id));
+    return firstUndone === -1 ? 0 : firstUndone;
+  });
   const [revealMode, setRevealMode] = useState<"off" | "picking" | "showing">("off");
   const [revealRoleId, setRevealRoleId] = useState<string | null>(null);
   const script = SCRIPTS[game.scriptId];
@@ -86,6 +90,17 @@ export function NightWalkthrough({
   const next = () => setIndex(i => Math.min(i + 1, steps.length - 1));
   const prev = () => setIndex(i => Math.max(i - 1, 0));
   const last = index === steps.length - 1;
+  const isDone = game.nightDone.includes(step.entry.player.id);
+
+  const markDone = (playerId: string) => {
+    if (!game.nightDone.includes(playerId)) {
+      dispatch({ type: "TOGGLE_NIGHT_DONE", storytellerId, playerId });
+    }
+  };
+  const validateAndAdvance = () => {
+    markDone(step.entry.player.id);
+    if (!last) next();
+  };
 
   const finishNight = () => {
     dispatch({ type: "TOGGLE_PHASE", storytellerId });
@@ -121,6 +136,11 @@ export function NightWalkthrough({
         <div className="flex items-center justify-between mb-2">
           <div className="text-indigo-300 text-xs uppercase tracking-[0.3em] flex items-center gap-2">
             <Moon className="w-3 h-3" /> Nuit {game.day} — étape {index + 1}/{total}
+            {isDone && (
+              <span className="flex items-center gap-1 text-emerald-300 normal-case tracking-normal">
+                <Check className="w-3 h-3" /> fait
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -137,8 +157,10 @@ export function NightWalkthrough({
         </div>
         <div className="h-1 bg-stone-800 overflow-hidden">
           <div
-            className="h-full bg-indigo-700 transition-all"
-            style={{ width: `${((index + 1) / total) * 100}%` }}
+            className="h-full bg-emerald-700 transition-all"
+            style={{
+              width: `${(steps.filter(s => game.nightDone.includes(s.entry.player.id)).length / total) * 100}%`,
+            }}
           />
         </div>
       </div>
@@ -181,7 +203,7 @@ export function NightWalkthrough({
           impaired={impaired}
           storytellerId={storytellerId}
           dispatch={dispatch}
-          onValidated={() => (last ? null : next())}
+          onValidated={validateAndAdvance}
         />
       </div>
 
@@ -194,10 +216,11 @@ export function NightWalkthrough({
           <ArrowLeft className="w-3 h-3" /> Préc.
         </button>
         <button
-          onClick={() => (last ? finishNight() : next())}
+          onClick={validateAndAdvance}
+          title="Marquer cette étape comme faite (sans saisir d'info) et avancer"
           className="flex-1 flex items-center justify-center gap-1 px-3 py-2 ring-1 ring-stone-700 bg-stone-800 hover:bg-stone-700 text-stone-300 text-xs uppercase tracking-wide"
         >
-          <SkipForward className="w-3 h-3" /> Passer
+          <SkipForward className="w-3 h-3" /> Rien à faire
         </button>
         {last ? (
           <button
