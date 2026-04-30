@@ -11,6 +11,8 @@ export interface ReminderPreset {
 export const REMINDER_PRESETS: ReminderPreset[] = [
   { id: "drunk",       label: "Ivre",        emoji: "🍺", badgeClass: "bg-amber-900 ring-amber-700 text-amber-200" },
   { id: "protected",   label: "Protégé",     emoji: "🛡️", badgeClass: "bg-blue-900 ring-blue-700 text-blue-200" },
+  { id: "to-die",      label: "Mort à l'aube", emoji: "💀", badgeClass: "bg-red-950 ring-red-800 text-red-200" },
+  { id: "poisoned",    label: "Empoisonné",  emoji: "☠️", badgeClass: "bg-purple-900 ring-purple-700 text-purple-200" },
   { id: "mad",         label: "Folie",       emoji: "🌀", badgeClass: "bg-fuchsia-900 ring-fuchsia-700 text-fuchsia-200" },
   { id: "used",        label: "Utilisée",    emoji: "✓",  badgeClass: "bg-stone-800 ring-stone-600 text-stone-300" },
   { id: "red-herring", label: "Red Herring", emoji: "🐟", badgeClass: "bg-rose-900 ring-rose-700 text-rose-200" },

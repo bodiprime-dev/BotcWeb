@@ -498,7 +498,31 @@ export function applyAction(state: GameState, action: GameAction): GameState {
         };
       }
       if (state.phase === "night") {
-        return { ...state, phase: "day", day: state.day + 1, nightDone: [] };
+        // Aube : applique les morts marquées "to-die" (sauf si "protected"),
+        // puis nettoie les reminders éphémères.
+        let next: GameState = state;
+        for (const p of state.players) {
+          const hasToDie = p.reminders.includes("to-die");
+          if (!hasToDie) continue;
+          const isProtected = p.reminders.includes("protected");
+          if (!isProtected && p.alive) {
+            next = applyAction(next, {
+              type: "TOGGLE_ALIVE",
+              storytellerId: state.storytellerId!,
+              playerId: p.id,
+            });
+          }
+        }
+        // Retire les reminders éphémères de la nuit qui vient de finir.
+        const ephemeral = new Set(["to-die", "protected"]);
+        next = {
+          ...next,
+          players: next.players.map(pl => ({
+            ...pl,
+            reminders: pl.reminders.filter(t => !ephemeral.has(t)),
+          })),
+        };
+        return { ...next, phase: "day", day: next.day + 1, nightDone: [] };
       }
       return state;
     }
