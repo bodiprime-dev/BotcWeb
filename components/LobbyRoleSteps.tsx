@@ -31,9 +31,11 @@ export function LobbyRoleSteps({
   const [lunaticBluffRoleIds, setLunaticBluffRoleIds] = useState<string[]>([]);
   const [demonBluffRoleIds, setDemonBluffRoleIds] = useState<string[]>([]);
 
+  // Les Voyageurs ne s'attribuent pas en lobby — ils s'ajoutent en cours de partie via
+  // le panneau GM (changement de rôle d'un joueur). On les exclut du wizard.
   const teamOrder: Team[] = ["townsfolk", "outsider", "minion", "demon"];
   const teamLabels: Record<Team, string> = {
-    townsfolk: "Townsfolk", outsider: "Outsiders", minion: "Minions", demon: "Démon",
+    townsfolk: "Townsfolk", outsider: "Outsiders", minion: "Minions", demon: "Démon", traveler: "Voyageurs",
   };
 
   if (step === "players") return null;

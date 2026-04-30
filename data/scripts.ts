@@ -6,7 +6,7 @@
 //  2) L'ajouter à l'objet `SCRIPTS` exporté en bas
 // ═══════════════════════════════════════════════════════════════════════
 
-export type Team = "townsfolk" | "outsider" | "minion" | "demon";
+export type Team = "townsfolk" | "outsider" | "minion" | "demon" | "traveler";
 
 export interface Role {
   name: string;
@@ -53,6 +53,9 @@ const TROUBLE_BREWING: Script = {
     scarletwoman:  { name: "Scarlet Woman",  team: "minion",    ability: "S'il y a 5+ joueurs vivants et que le Démon meurt, tu deviens le Démon." },
     baron:         { name: "Baron",          team: "minion",    ability: "Il y a 2 Outsiders supplémentaires en jeu." },
     imp:           { name: "Imp",            team: "demon",     ability: "Chaque nuit (sauf la 1re), tue un joueur. Si tu te tues, un Minion devient l'Imp.", otherNight: 24 },
+    bureaucrat:    { name: "Bureaucrat",     team: "traveler",  ability: "Chaque jour, choisis un joueur : ses votes comptent triple aujourd'hui." },
+    thief:         { name: "Thief",          team: "traveler",  ability: "Chaque jour, choisis un joueur : ses votes comptent négativement aujourd'hui." },
+    scapegoat:     { name: "Scapegoat",      team: "traveler",  ability: "Si un joueur de ton alignement est exécuté, tu peux mourir à sa place." },
   },
 };
 
@@ -123,6 +126,7 @@ export const TEAM_COLORS: Record<Team, { bg: string; ring: string; text: string;
   outsider:  { bg: "bg-stone-900", ring: "ring-amber-600/40", text: "text-amber-100", label: "Outsider",  accent: "bg-amber-500" },
   minion:    { bg: "bg-stone-900", ring: "ring-red-900/60",   text: "text-red-300",   label: "Minion",    accent: "bg-red-800" },
   demon:     { bg: "bg-stone-900", ring: "ring-red-700/70",   text: "text-rose-200",  label: "Démon",     accent: "bg-red-700" },
+  traveler:  { bg: "bg-stone-900", ring: "ring-emerald-700/60", text: "text-emerald-200", label: "Voyageur", accent: "bg-emerald-700" },
 };
 
 export const getScriptList = () =>

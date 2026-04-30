@@ -1,6 +1,7 @@
 "use client";
 import { FlaskConical, Gavel, Skull } from "lucide-react";
 import { SCRIPTS, TEAM_COLORS, type Team } from "@/data/scripts";
+import { getReminderPreset } from "@/data/reminders";
 import type { GameState } from "@/lib/types";
 import { useWindowSize } from "@/hooks/useWindowSize";
 import { RoleIcon } from "./RoleIcon";
@@ -81,6 +82,18 @@ export function Grimoire({
                   <Skull className="w-6 h-6 text-stone-500" />
                 </div>
               )}
+              {!p.alive && (
+                <div
+                  title={p.ghostVoteUsed ? "Vote fantôme déjà utilisé" : "Vote fantôme disponible"}
+                  className={`absolute -bottom-1 -left-1 w-4 h-4 rounded-full ring-1 flex items-center justify-center text-[9px] font-bold ${
+                    p.ghostVoteUsed
+                      ? "bg-stone-800 ring-stone-700 text-stone-600"
+                      : "bg-purple-900 ring-purple-600 text-purple-100"
+                  }`}
+                >
+                  V
+                </div>
+              )}
               {p.poisoned && p.alive && (
                 <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-purple-800 ring-1 ring-purple-600 flex items-center justify-center">
                   <FlaskConical className="w-2.5 h-2.5 text-purple-200" />
@@ -93,6 +106,24 @@ export function Grimoire({
               )}
             </div>
             <div className="text-center mt-1 text-stone-200 text-xs">{p.name}</div>
+            {p.reminders.length > 0 && (
+              <div className="flex flex-wrap gap-0.5 justify-center mt-0.5 max-w-[110px]">
+                {p.reminders.map((tok, ri) => {
+                  const pr = getReminderPreset(tok);
+                  return (
+                    <span
+                      key={ri}
+                      title={pr?.label ?? tok}
+                      className={`inline-block px-1 py-px ring-1 text-[8px] leading-tight ${
+                        pr?.badgeClass ?? "bg-stone-800 ring-stone-600 text-stone-300"
+                      }`}
+                    >
+                      {pr?.emoji ?? ""}{pr ? "" : tok.slice(0, 6)}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
           </button>
         );
       })}

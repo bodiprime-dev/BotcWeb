@@ -13,12 +13,13 @@ export function ScriptReference({
 }) {
   const script = SCRIPTS[scriptId];
   const [expanded, setExpanded] = useState<string | null>(null);
-  const teamOrder: Team[] = ["townsfolk", "outsider", "minion", "demon"];
+  const teamOrder: Team[] = ["townsfolk", "outsider", "minion", "demon", "traveler"];
   const teamLabels: Record<Team, string> = {
     townsfolk: "Townsfolk",
     outsider: "Outsiders",
     minion: "Minions",
     demon: "Démon",
+    traveler: "Voyageurs",
   };
 
   return (
