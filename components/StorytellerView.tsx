@@ -25,12 +25,12 @@ export function StorytellerView({
   const [showScript, setShowScript] = useState(false);
   const [showRoleReveal, setShowRoleReveal] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
-  const [walkthroughOpen, setWalkthroughOpen] = useState(false);
+  const [walkthroughMounted, setWalkthroughMounted] = useState(false);
+  const [walkthroughVisible, setWalkthroughVisible] = useState(false);
 
   const selected = game.players.find(p => p.id === selectedId);
 
   useEffect(() => { if (selectedId) setPanelOpen(true); }, [selectedId]);
-  useEffect(() => { if (game.phase === "night") setPanelOpen(true); }, [game.phase]);
 
   const closePanel = () => { setSelectedId(null); setPanelOpen(false); };
 
@@ -88,7 +88,7 @@ export function StorytellerView({
           </div>
           {game.phase === "night" && (
             <button
-              onClick={() => setWalkthroughOpen(true)}
+              onClick={() => { setWalkthroughMounted(true); setWalkthroughVisible(true); }}
               className="flex items-center gap-1.5 px-3 py-1.5 ring-1 ring-indigo-700 bg-indigo-900 hover:bg-indigo-800 text-indigo-100 text-xs uppercase tracking-wider"
             >
               <Wand2 className="w-3 h-3" /> <span className="hidden sm:inline">Guide</span>
@@ -156,13 +156,23 @@ export function StorytellerView({
 
       <ChatPanel game={game} me={me} dispatch={dispatch} />
 
-      {walkthroughOpen && (
+      {walkthroughMounted && game.phase === "night" && (
         <NightWalkthrough
           game={game}
           storytellerId={me.id}
           dispatch={dispatch}
-          onClose={() => setWalkthroughOpen(false)}
+          visible={walkthroughVisible}
+          onMinimize={() => setWalkthroughVisible(false)}
+          onFinished={() => { setWalkthroughMounted(false); setWalkthroughVisible(false); }}
         />
+      )}
+      {walkthroughMounted && !walkthroughVisible && game.phase === "night" && (
+        <button
+          onClick={() => setWalkthroughVisible(true)}
+          className="fixed bottom-4 left-4 z-30 flex items-center gap-2 px-4 py-2 ring-1 ring-indigo-700 bg-indigo-900 hover:bg-indigo-800 text-indigo-100 text-xs uppercase tracking-wider shadow-xl"
+        >
+          <Wand2 className="w-3 h-3" /> Reprendre le guide
+        </button>
       )}
     </div>
   );

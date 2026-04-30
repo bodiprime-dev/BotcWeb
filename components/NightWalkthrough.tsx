@@ -1,8 +1,8 @@
 "use client";
 import { useMemo, useState } from "react";
-import { AlertTriangle, ArrowLeft, ArrowRight, Check, Moon, SkipForward, X } from "lucide-react";
-import { SCRIPTS } from "@/data/scripts";
-import { getNightTemplate, type NightAction, type NightTemplate } from "@/data/nightTemplates";
+import { AlertTriangle, ArrowLeft, ArrowRight, Check, Eye, Minimize2, Moon, SkipForward } from "lucide-react";
+import { SCRIPTS, TEAM_COLORS, type Team } from "@/data/scripts";
+import { getNightTemplate, type NightTemplate } from "@/data/nightTemplates";
 import type { GameAction, GameState, Player, RoleInfoEntry } from "@/lib/types";
 import { useNightOrder, type NightOrderEntry } from "@/hooks/useNightOrder";
 import { RoleIcon } from "./RoleIcon";
@@ -35,26 +35,32 @@ export function NightWalkthrough({
   game,
   storytellerId,
   dispatch,
-  onClose,
+  visible,
+  onMinimize,
+  onFinished,
 }: {
   game: GameState;
   storytellerId: string;
   dispatch: (action: GameAction) => void;
-  onClose: () => void;
+  visible: boolean;
+  onMinimize: () => void;
+  onFinished: () => void;
 }) {
   const order = useNightOrder(game);
   const steps = useMemo(() => buildSteps(game, order), [game, order]);
   const [index, setIndex] = useState(0);
+  const [revealMode, setRevealMode] = useState<"off" | "picking" | "showing">("off");
+  const [revealRoleId, setRevealRoleId] = useState<string | null>(null);
   const script = SCRIPTS[game.scriptId];
 
   if (steps.length === 0) {
     return (
-      <Shell onClose={onClose}>
+      <Shell visible={visible} onMinimize={onMinimize}>
         <div className="text-stone-300 text-center p-8">
           Aucun rôle n'a d'action à mener cette nuit.
           <div className="mt-4">
             <button
-              onClick={onClose}
+              onClick={onFinished}
               className="px-4 py-2 ring-1 ring-stone-700 bg-stone-800 hover:bg-stone-700 text-stone-200 text-xs uppercase tracking-wide"
             >
               Fermer
@@ -83,19 +89,51 @@ export function NightWalkthrough({
 
   const finishNight = () => {
     dispatch({ type: "TOGGLE_PHASE", storytellerId });
-    onClose();
+    onFinished();
   };
 
+  if (revealMode === "picking") {
+    return (
+      <Shell visible={visible} onMinimize={onMinimize}>
+        <RolePickerScreen
+          scriptId={game.scriptId}
+          onPick={(roleId) => { setRevealRoleId(roleId); setRevealMode("showing"); }}
+          onCancel={() => setRevealMode("off")}
+        />
+      </Shell>
+    );
+  }
+  if (revealMode === "showing" && revealRoleId) {
+    return (
+      <Shell visible={visible} onMinimize={onMinimize}>
+        <RevealScreen
+          scriptId={game.scriptId}
+          roleId={revealRoleId}
+          onBack={() => setRevealMode("off")}
+        />
+      </Shell>
+    );
+  }
+
   return (
-    <Shell onClose={onClose}>
+    <Shell visible={visible} onMinimize={onMinimize}>
       <div className="px-4 pt-3 pb-2 border-b border-stone-800">
         <div className="flex items-center justify-between mb-2">
           <div className="text-indigo-300 text-xs uppercase tracking-[0.3em] flex items-center gap-2">
             <Moon className="w-3 h-3" /> Nuit {game.day} — étape {index + 1}/{total}
           </div>
-          <button onClick={onClose} className="text-stone-400 hover:text-stone-200" aria-label="Fermer">
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setRevealMode("picking")}
+              title="Révéler un rôle au joueur"
+              className="flex items-center gap-1 px-2 py-1 ring-1 ring-stone-700 bg-stone-900 hover:bg-stone-800 text-stone-300 text-[11px] uppercase tracking-wide"
+            >
+              <Eye className="w-3 h-3" /> Révéler
+            </button>
+            <button onClick={onMinimize} className="text-stone-400 hover:text-stone-200" aria-label="Réduire">
+              <Minimize2 className="w-5 h-5" />
+            </button>
+          </div>
         </div>
         <div className="h-1 bg-stone-800 overflow-hidden">
           <div
@@ -181,9 +219,20 @@ export function NightWalkthrough({
   );
 }
 
-function Shell({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
+function Shell({
+  children,
+  visible,
+  onMinimize,
+}: {
+  children: React.ReactNode;
+  visible: boolean;
+  onMinimize: () => void;
+}) {
   return (
-    <div className="fixed inset-0 z-50 bg-stone-950/95 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4" onClick={onClose}>
+    <div
+      className={`fixed inset-0 z-50 bg-stone-950/95 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 ${visible ? "" : "hidden"}`}
+      onClick={onMinimize}
+    >
       <div
         className="bg-stone-950 ring-1 ring-stone-800 max-w-2xl w-full max-h-[100dvh] flex flex-col"
         onClick={e => e.stopPropagation()}
@@ -191,6 +240,88 @@ function Shell({ children, onClose }: { children: React.ReactNode; onClose: () =
       >
         {children}
       </div>
+    </div>
+  );
+}
+
+function RolePickerScreen({
+  scriptId,
+  onPick,
+  onCancel,
+}: {
+  scriptId: string;
+  onPick: (roleId: string) => void;
+  onCancel: () => void;
+}) {
+  const script = SCRIPTS[scriptId];
+  const teamOrder: Team[] = ["townsfolk", "outsider", "minion", "demon"];
+  return (
+    <>
+      <div className="flex items-center justify-between px-4 py-3 border-b border-stone-800">
+        <button onClick={onCancel} className="text-stone-400 hover:text-stone-200 text-xs uppercase tracking-wider">
+          ← Retour au guide
+        </button>
+        <div className="text-stone-400 text-xs uppercase tracking-[0.2em]">Choisir un rôle à révéler</div>
+        <div className="w-20" />
+      </div>
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {teamOrder.map(t => {
+          const roles = Object.entries(script.roles).filter(([, r]) => r.team === t);
+          if (!roles.length) return null;
+          const c = TEAM_COLORS[t];
+          return (
+            <div key={t}>
+              <div className={`text-[10px] uppercase tracking-[0.25em] mb-2 ${c.text} opacity-70`}>{c.label}</div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {roles.map(([id, r]) => (
+                  <button
+                    key={id}
+                    onClick={() => onPick(id)}
+                    className="flex items-center gap-2 p-2 bg-stone-900 ring-1 ring-stone-700 hover:ring-stone-500 text-left"
+                  >
+                    <RoleIcon roleId={id} size={32} />
+                    <span className="text-sm text-stone-200">{r.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+function RevealScreen({
+  scriptId,
+  roleId,
+  onBack,
+}: {
+  scriptId: string;
+  roleId: string;
+  onBack: () => void;
+}) {
+  const script = SCRIPTS[scriptId];
+  const role = script.roles[roleId];
+  const tc = role ? TEAM_COLORS[role.team as Team] : null;
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center text-center px-4 py-8 relative">
+      <button
+        onClick={onBack}
+        className="absolute top-3 left-3 text-stone-400 hover:text-stone-200 text-xs uppercase tracking-wider"
+      >
+        ← Retour
+      </button>
+      <RoleIcon roleId={roleId} size={160} />
+      <div className={`mt-4 text-4xl font-light italic ${tc?.text ?? "text-stone-100"}`}>{role?.name}</div>
+      {tc && (
+        <div className={`mt-2 text-xs uppercase tracking-[0.2em] px-3 py-1 ring-1 ${tc.accent} opacity-80`}>
+          {tc.label}
+        </div>
+      )}
+      {role && (
+        <p className="mt-4 text-stone-400 text-sm max-w-sm leading-relaxed">{role.ability}</p>
+      )}
     </div>
   );
 }
@@ -372,25 +503,33 @@ function PlayerGrid({
   onToggle: (id: string) => void;
   max: number;
 }) {
+  const script = SCRIPTS[game.scriptId];
   const targets = game.players.filter(p => !p.isStoryteller && p.id !== self.id);
   return (
     <div className="grid grid-cols-3 gap-2">
       {targets.map(p => {
         const sel = selected.includes(p.id);
         const full = !sel && selected.length >= max;
+        const role = p.role ? script.roles[p.role] : null;
         return (
           <button
             key={p.id}
             disabled={!p.alive || full}
             onClick={() => onToggle(p.id)}
-            className={`p-2 ring-1 text-xs transition-all ${
+            className={`flex flex-col items-center gap-1 p-2 ring-1 text-xs transition-all ${
               sel
                 ? "bg-amber-900 ring-amber-600 text-amber-100"
                 : "bg-stone-900 ring-stone-700 text-stone-300 hover:ring-stone-500"
             } ${!p.alive ? "opacity-40" : ""} ${full ? "opacity-30" : ""}`}
           >
-            {p.name}
-            {!p.alive && <div className="text-[10px] text-stone-500">mort</div>}
+            {p.role && <RoleIcon roleId={p.role} size={28} />}
+            <div className="font-medium leading-none">{p.name}</div>
+            {role && (
+              <div className="text-[9px] text-stone-400 leading-none truncate w-full">
+                {role.name}{p.role === "drunk" ? " 🍺" : ""}
+              </div>
+            )}
+            {!p.alive && <div className="text-[9px] text-stone-500">mort</div>}
           </button>
         );
       })}
