@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, Moon, X } from "lucide-react";
 import type { GameState, GameAction, Player } from "@/lib/types";
 
@@ -15,8 +15,16 @@ export function NightPromptModal({
   const prompt = me.nightPrompt;
   const submitted = me.nightSubmission;
   const [picked, setPicked] = useState<string[]>([]);
+  const [dismissed, setDismissed] = useState(false);
+
+  // Réinitialise l'état "dismissed" quand un nouveau prompt arrive
+  useEffect(() => {
+    setDismissed(false);
+    setPicked([]);
+  }, [prompt?.label, prompt?.kind]);
 
   if (!prompt) return null;
+  if (dismissed) return null;
 
   const targets = game.players.filter(p => !p.isStoryteller && p.id !== me.id);
 
@@ -48,9 +56,15 @@ export function NightPromptModal({
         <div className="bg-stone-900 ring-1 ring-indigo-700/60 max-w-md w-full p-6 text-center">
           <Check className="w-10 h-10 text-emerald-400 mx-auto mb-3" />
           <div className="text-stone-100 text-lg mb-1">Réponse envoyée</div>
-          <div className="text-stone-400 text-sm">
+          <div className="text-stone-400 text-sm mb-4">
             En attente du Conteur…
           </div>
+          <button
+            onClick={() => setDismissed(true)}
+            className="w-full p-2 ring-1 ring-stone-700 bg-stone-800 hover:bg-stone-700 text-stone-200 text-xs uppercase tracking-wide"
+          >
+            Fermer
+          </button>
         </div>
       </div>
     );
