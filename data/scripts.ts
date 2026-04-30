@@ -91,6 +91,9 @@ const BAD_MOON_RISING: Script = {
     pukka:         { name: "Pukka",           team: "demon",     ability: "Chaque nuit, empoisonne un joueur : il meurt la nuit suivante. Tu en empoisonnes alors un autre.", firstNight: 26, otherNight: 25 },
     shabaloth:     { name: "Shabaloth",       team: "demon",     ability: "Chaque nuit (sauf la 1re), tue 2 joueurs. Une victime de la nuit dernière peut revivre.", otherNight: 27 },
     po:            { name: "Po",              team: "demon",     ability: "Chaque nuit (sauf la 1re), tu peux tuer un joueur. Si non, tue 3 joueurs la nuit suivante.", otherNight: 29 },
+    bureaucrat:    { name: "Bureaucrat",     team: "traveler",  ability: "Chaque jour, choisis un joueur : ses votes comptent triple aujourd'hui." },
+    thief:         { name: "Thief",          team: "traveler",  ability: "Chaque jour, choisis un joueur : ses votes comptent négativement aujourd'hui." },
+    scapegoat:     { name: "Scapegoat",      team: "traveler",  ability: "Si un joueur de ton alignement est exécuté, tu peux mourir à sa place." },
   },
 };
 

@@ -359,11 +359,17 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       if (action.selectedRoleIds.length >= playerCount) {
         assignedRoles = shuffle(action.selectedRoleIds).slice(0, playerCount);
       } else {
-        const baseDist = ROLE_DISTRIBUTION[playerCount] ?? ROLE_DISTRIBUTION[15];
-        const byTeam: Record<string, string[]> = { townsfolk: [], outsider: [], minion: [], demon: [] };
+        // Au-delà de 15 joueurs, les surnuméraires sont des Voyageurs.
+        // On garde la distribution standard pour les 15 premiers.
+        const standardCount = Math.min(playerCount, 15);
+        const travelerCount = Math.max(0, playerCount - 15);
+        const baseDist = ROLE_DISTRIBUTION[standardCount] ?? ROLE_DISTRIBUTION[15];
+        const byTeam: Record<string, string[]> = { townsfolk: [], outsider: [], minion: [], demon: [], traveler: [] };
         for (const [id, role] of Object.entries(script.roles)) {
           byTeam[role.team]?.push(id);
         }
+        // Au-delà de 15 sans Voyageur dans le script, on refuse le démarrage.
+        if (travelerCount > 0 && byTeam.traveler.length === 0) return state;
         // 1) On tire d'abord les minions et démon, puis on regarde si un setup-modifier
         //    impose un ajustement (Baron : +2 Outsiders / -2 Townsfolk).
         const minions = shuffle(byTeam.minion).slice(0, baseDist.minions);
@@ -377,7 +383,13 @@ export function applyAction(state: GameState, action: GameAction): GameState {
         }
         const outsiders = shuffle(byTeam.outsider).slice(0, outsiderCount);
         const townsfolk = shuffle(byTeam.townsfolk).slice(0, townsfolkCount);
-        assignedRoles = shuffle([...townsfolk, ...outsiders, ...minions, ...demons]);
+        // Voyageurs : tirage avec remise si la liste est plus courte que travelerCount
+        const travelers: string[] = [];
+        for (let i = 0; i < travelerCount; i++) {
+          const pool = byTeam.traveler;
+          travelers.push(pool[Math.floor(Math.random() * pool.length)]);
+        }
+        assignedRoles = shuffle([...townsfolk, ...outsiders, ...minions, ...demons, ...travelers]);
       }
 
       // Passe 1 : assigner les rôles (sans roleInfo encore)
