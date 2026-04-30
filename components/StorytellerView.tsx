@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { ArrowLeft, BookOpen, Eye, Moon, PanelRightClose, PanelRightOpen, Sun } from "lucide-react";
+import { ArrowLeft, BookOpen, Eye, Moon, PanelRightClose, PanelRightOpen, Sun, Wand2 } from "lucide-react";
 import type { GameState, GameAction, Player, RoleInfoEntry } from "@/lib/types";
 import { Grimoire } from "./Grimoire";
 import { StorytellerDrawer } from "./StorytellerDrawer";
@@ -8,6 +8,7 @@ import { ScriptReference } from "./ScriptReference";
 import { RoleRevealModal } from "./RoleRevealModal";
 import { VictoryBanner } from "./VictoryBanner";
 import { ChatPanel } from "./ChatPanel";
+import { NightWalkthrough } from "./NightWalkthrough";
 
 export function StorytellerView({
   game,
@@ -24,6 +25,7 @@ export function StorytellerView({
   const [showScript, setShowScript] = useState(false);
   const [showRoleReveal, setShowRoleReveal] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [walkthroughOpen, setWalkthroughOpen] = useState(false);
 
   const selected = game.players.find(p => p.id === selectedId);
 
@@ -84,6 +86,14 @@ export function StorytellerView({
           <div className="text-stone-400 text-xs tracking-[0.2em] uppercase hidden sm:block">
             {game.phase === "day" ? "Jour" : "Nuit"} {game.day}
           </div>
+          {game.phase === "night" && (
+            <button
+              onClick={() => setWalkthroughOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 ring-1 ring-indigo-700 bg-indigo-900 hover:bg-indigo-800 text-indigo-100 text-xs uppercase tracking-wider"
+            >
+              <Wand2 className="w-3 h-3" /> <span className="hidden sm:inline">Guide</span>
+            </button>
+          )}
           <button
             onClick={() => dispatch({ type: "TOGGLE_PHASE", storytellerId: me.id })}
             className={`flex items-center gap-2 px-4 py-2 ring-1 ${
@@ -145,6 +155,15 @@ export function StorytellerView({
       />
 
       <ChatPanel game={game} me={me} dispatch={dispatch} />
+
+      {walkthroughOpen && (
+        <NightWalkthrough
+          game={game}
+          storytellerId={me.id}
+          dispatch={dispatch}
+          onClose={() => setWalkthroughOpen(false)}
+        />
+      )}
     </div>
   );
 }
