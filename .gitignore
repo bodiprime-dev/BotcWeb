@@ -15,8 +15,12 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Vercel
+# Vercel (legacy — peut être retiré une fois la migration finalisée)
 .vercel
+
+# Prisma
+/prisma/migrations/dev.db
+/prisma/migrations/dev.db-journal
 
 # TypeScript
 *.tsbuildinfo
