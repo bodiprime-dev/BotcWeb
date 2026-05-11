@@ -72,7 +72,7 @@ export function PlayerView({
                 <div className="flex justify-center mb-3">
                   <RoleIcon roleId={displayRoleId} size={96} />
                 </div>
-                <h2 className="text-5xl mb-4 italic text-amber-100">{myRole.name}</h2>
+                <h2 className="text-5xl mb-4 italic text-amber-100 font-display">{myRole.name}</h2>
                 <div className="text-left max-w-md mx-auto bg-stone-950/60 ring-1 ring-stone-700 p-4 mb-4">
                   <div className="text-xs uppercase text-amber-500/70 tracking-wider mb-2">Capacité</div>
                   <p className="text-stone-200 leading-relaxed text-sm">{myRole.ability}</p>

@@ -17,7 +17,7 @@ export function VictoryBanner({ game }: { game: GameState }) {
         {isGood ? <Crown className="w-5 h-5" /> : <Skull className="w-5 h-5" />}
         <span className="text-xs uppercase tracking-[0.3em] opacity-80">Fin de partie</span>
       </div>
-      <div className={`text-3xl tracking-wide italic ${isGood ? "text-amber-200" : "text-red-200"}`}>
+      <div className={`text-3xl tracking-wide italic font-display ${isGood ? "text-amber-200" : "text-red-200"}`}>
         {isGood ? "Les Bons l'emportent" : "Les Maléfiques l'emportent"}
       </div>
       {game.winReason && (

@@ -55,7 +55,7 @@ export function StorytellerDrawer({
             <div className="flex items-start justify-between mb-3">
               <div>
                 <div className="text-xs uppercase text-stone-400">Joueur</div>
-                <div className="text-2xl text-stone-100">{selected.name}</div>
+                <div className="text-2xl text-stone-100 font-display">{selected.name}</div>
                 {selected.role === "drunk" && (
                   <div className="text-xs text-amber-300 mt-0.5">
                     🍺 Drunk — pense être {ROLES[selected.displayRole!]?.name}
@@ -77,10 +77,10 @@ export function StorytellerDrawer({
                       {TEAM_COLORS[ROLES[selected.role!].team as Team].label}
                     </span>
                   </div>
-                  <div className={`text-lg italic mb-1 ${TEAM_COLORS[ROLES[selected.role!].team as Team].text}`}>
+                  <div className={`text-xl italic mb-1 font-display ${TEAM_COLORS[ROLES[selected.role!].team as Team].text}`}>
                     {ROLES[selected.role!].name}
                   </div>
-                  <p className="text-xs text-stone-400 leading-relaxed">{ROLES[selected.role!].ability}</p>
+                  <p className="text-[13px] text-stone-300 leading-relaxed">{ROLES[selected.role!].ability}</p>
                 </div>
               </div>
             </div>

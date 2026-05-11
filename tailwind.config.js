@@ -8,7 +8,14 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        serif: ["'Cormorant Garamond'", "'Times New Roman'", "serif"],
+        // Police de corps : Lora — un serif moderne plus lisible que
+        // Cormorant Garamond à petite taille, tout en gardant le ton
+        // élégant et littéraire du jeu.
+        serif: ["Lora", "'Times New Roman'", "serif"],
+        // Police décorative — utilisée pour les titres, codes de partie,
+        // noms de rôles. Cormorant Garamond garde son rôle stylé sur les
+        // grandes typos où sa finesse fait sens.
+        display: ["'Cormorant Garamond'", "Lora", "'Times New Roman'", "serif"],
       },
     },
   },

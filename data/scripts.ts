@@ -387,6 +387,41 @@ export const TEAM_COLORS: Record<Team, { bg: string; ring: string; text: string;
   traveler:  { bg: "bg-stone-900", ring: "ring-emerald-700/60", text: "text-emerald-200", label: "Voyageur", accent: "bg-emerald-700" },
 };
 
+// ─── Descriptions des équipes ──────────────────────────────────────────
+//
+// Rappel synthétique de ce que représente chaque équipe à Ravenswood
+// Bluff. Affiché dans la modale « Voir les rôles du script » au-dessus
+// de chaque section. Volontairement court : 1 paragraphe par équipe,
+// orienté joueur (« tu / vous »).
+//
+export const TEAM_DESCRIPTIONS: Record<Team, { tagline: string; details: string }> = {
+  townsfolk: {
+    tagline: "Le camp des Bons. La majorité du village.",
+    details:
+      "Chaque Townsfolk possède une capacité unique au service de l'enquête : déduire qui est le Démon, échanger des informations, se protéger. Pour gagner, vous devez collectivement exécuter le Démon avant qu'il ne décime le village.",
+  },
+  outsider: {
+    tagline: "Bons mais handicapants pour le camp du Bien.",
+    details:
+      "Les Outsiders jouent avec les Bons mais leurs capacités les pénalisent (informations faussées, vote restreint, défaite si exécuté…). Ils peuvent être manipulés par les Maléfiques et compliquent la lecture du jeu pour les Townsfolk.",
+  },
+  minion: {
+    tagline: "Le camp du Mal — les Sbires du Démon.",
+    details:
+      "Les Sbires connaissent l'identité du Démon (et entre eux) dès la première nuit. Leur rôle est de protéger le Démon, semer la confusion, empoisonner ou affaiblir les Townsfolk, et faire exécuter les Bons. Ils gagnent avec le Démon.",
+  },
+  demon: {
+    tagline: "Le chef des Maléfiques. Un seul par partie.",
+    details:
+      "Le Démon connaît ses Sbires et reçoit 3 bluffs : des rôles Townsfolk absents du jeu qu'il peut prétendre être. Chaque nuit (sauf parfois la 1re), il tue un joueur. Le Mal gagne dès qu'il ne reste que 2 joueurs vivants ou si un Saint est exécuté.",
+  },
+  traveler: {
+    tagline: "Joueurs de passage, alignement public.",
+    details:
+      "Les Voyageurs rejoignent ou quittent la table sans casser la partie. Leur alignement (Bon ou Mal) est connu de tous dès leur arrivée. Ils possèdent des capacités diurnes spéciales et peuvent être exilés à la majorité sans nomination formelle.",
+  },
+};
+
 export const getScriptList = () =>
   Object.values(SCRIPTS).map(s => ({
     id: s.id,

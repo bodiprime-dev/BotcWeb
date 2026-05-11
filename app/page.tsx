@@ -43,8 +43,8 @@ export default function HomePage() {
     <div className="min-h-screen flex flex-col items-center justify-center px-6 py-16">
       <div className="text-center mb-14">
         <Skull className="w-16 h-16 text-stone-300 mx-auto mb-6" strokeWidth={1.2} />
-        <h1 className="text-4xl md:text-6xl tracking-wider text-stone-100 mb-2 font-semibold">Blood on the</h1>
-        <h1 className="text-4xl md:text-6xl tracking-wider text-red-500 italic font-semibold">Clocktower</h1>
+        <h1 className="text-4xl md:text-6xl tracking-wider text-stone-100 mb-2 font-semibold font-display">Blood on the</h1>
+        <h1 className="text-4xl md:text-6xl tracking-wider text-red-500 italic font-semibold font-display">Clocktower</h1>
         <p className="mt-5 text-stone-500 tracking-[0.3em] text-xs uppercase">— Table Virtuelle —</p>
       </div>
 
