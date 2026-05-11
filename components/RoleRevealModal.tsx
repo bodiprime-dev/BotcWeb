@@ -100,9 +100,9 @@ export function RoleRevealModal({
 
       <div className="flex flex-col items-center gap-4 mb-8 text-center">
         <RoleIcon roleId={selectedRoleId!} size={140} />
-        <div className={`text-4xl font-light italic ${tc?.text ?? "text-stone-100"}`}>{role?.name}</div>
+        <div className={`text-4xl font-light italic font-display ${tc?.text ?? "text-stone-100"}`}>{role?.name}</div>
         <div className={`text-xs uppercase tracking-[0.2em] px-3 py-1 ring-1 ${tc?.accent ?? ""} opacity-80`}>{tc?.label}</div>
-        <p className="text-stone-400 text-sm max-w-sm leading-relaxed">{role?.ability}</p>
+        <p className="text-stone-200 text-[15px] max-w-md leading-relaxed">{role?.ability}</p>
       </div>
 
       {!showAdd ? (

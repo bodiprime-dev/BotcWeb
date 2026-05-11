@@ -122,7 +122,7 @@ export default function GamePage() {
         </button>
         <div className="text-center mb-6">
           <div className="text-xs tracking-[0.3em] uppercase text-stone-500 mb-2">Partie</div>
-          <div className="text-4xl tracking-[0.4em] text-stone-100">{code}</div>
+          <div className="text-4xl tracking-[0.4em] text-stone-100 font-display">{code}</div>
         </div>
         <div className="w-full max-w-sm">
           <label className="text-stone-400 text-xs tracking-[0.2em] uppercase mb-2 block">Ton nom</label>
@@ -184,7 +184,7 @@ function Lobby({ game, me, dispatch, onLeave }: {
 
         <div className="text-center mb-8">
           <div className="text-xs tracking-[0.3em] uppercase text-stone-500 mb-2">Code de partie</div>
-          <div className="text-5xl tracking-[0.4em] text-stone-100 mb-4">{game.code}</div>
+          <div className="text-5xl tracking-[0.4em] text-stone-100 mb-4 font-display">{game.code}</div>
           <div className="text-stone-400 text-sm italic">{script.name}</div>
           <p className="text-stone-600 text-xs mt-2">Partage ce code avec les autres joueurs</p>
         </div>

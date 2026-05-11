@@ -148,7 +148,7 @@ export function NightWalkthrough({
           <RoleIcon roleId={step.orderRoleId} size={64} />
           <div className="flex-1 min-w-0">
             <div className="text-stone-500 text-xs uppercase tracking-wider">{player.name}</div>
-            <h2 className="text-xl text-amber-100 italic">{role.name}</h2>
+            <h2 className="text-2xl text-amber-100 italic font-display">{role.name}</h2>
             {realRole.name !== role.name && (
               <div className="text-xs text-stone-500">
                 (vrai rôle : <span className="text-stone-300">{realRole.name}</span>)
@@ -313,7 +313,7 @@ function RevealScreen({
         ← Retour
       </button>
       <RoleIcon roleId={roleId} size={160} />
-      <div className={`mt-4 text-4xl font-light italic ${tc?.text ?? "text-stone-100"}`}>{role?.name}</div>
+      <div className={`mt-4 text-4xl font-light italic font-display ${tc?.text ?? "text-stone-100"}`}>{role?.name}</div>
       {tc && (
         <div className={`mt-2 text-xs uppercase tracking-[0.2em] px-3 py-1 ring-1 ${tc.accent} opacity-80`}>
           {tc.label}

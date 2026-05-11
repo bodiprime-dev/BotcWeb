@@ -6,3 +6,14 @@ html, body {
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior: none;
 }
+
+/* Hausse globale de la taille des très petits libellés. Plutôt que de
+   passer en revue chaque `text-xs` / `text-[10px]` du code, on relève
+   leur taille rendue. La hiérarchie typographique reste préservée
+   (xs < sm < base), mais le plancher de lisibilité est plus haut.
+   xs : 12px → 13px ; 10px : passe à 11.5px ; tracking aéré pour les
+   capitales très espacées qui restent compactes à petites tailles. */
+.text-xs       { font-size: 13px; line-height: 1.4; }
+.text-\[10px\] { font-size: 11.5px; line-height: 1.4; }
+.text-\[11px\] { font-size: 12.5px; line-height: 1.4; }
+.text-sm       { font-size: 15px; line-height: 1.5; }

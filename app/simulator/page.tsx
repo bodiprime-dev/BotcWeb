@@ -39,7 +39,7 @@ export default function SimulatorPage() {
           <div className="inline-flex items-center gap-2 mb-4 px-3 py-1 ring-1 ring-amber-700/40 bg-amber-950/30 text-amber-200 text-xs uppercase tracking-[0.2em]">
             🧪 Mode simulation
           </div>
-          <h1 className="text-3xl tracking-wider text-stone-100 mb-2">Tester l'application</h1>
+          <h1 className="text-3xl tracking-wider text-stone-100 mb-2 font-display">Tester l'application</h1>
           <p className="text-stone-500 text-sm max-w-md text-center">
             Une partie locale (sans serveur, sans Pusher) pour valider les workflows :
             choix des rôles, Drunk, ordre nocturne, nominations…
@@ -196,8 +196,8 @@ function SimLobby({ game, me, dispatch, prefillRoleInfo }: {
     <div className="p-6 max-w-2xl mx-auto">
       <div className="text-center mb-8">
         <div className="text-xs tracking-[0.3em] uppercase text-stone-500 mb-2">Lobby</div>
-        <div className="text-5xl tracking-[0.4em] text-stone-100 mb-4">{game.code}</div>
-        <div className="text-stone-400 text-sm italic">{script.name}</div>
+        <div className="text-5xl tracking-[0.4em] text-stone-100 mb-4 font-display">{game.code}</div>
+        <div className="text-stone-300 text-base italic">{script.name}</div>
       </div>
 
       <div className="bg-stone-900 ring-1 ring-stone-700 p-4 mb-6">

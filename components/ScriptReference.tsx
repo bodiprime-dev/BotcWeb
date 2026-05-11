@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { BookOpen, X, ChevronDown, ChevronUp } from "lucide-react";
-import { SCRIPTS, TEAM_COLORS, type Team } from "@/data/scripts";
+import { SCRIPTS, TEAM_COLORS, TEAM_DESCRIPTIONS, type Team } from "@/data/scripts";
 import { RoleIcon } from "./RoleIcon";
 
 export function ScriptReference({
@@ -17,7 +17,7 @@ export function ScriptReference({
   const teamLabels: Record<Team, string> = {
     townsfolk: "Townsfolk",
     outsider: "Outsiders",
-    minion: "Minions",
+    minion: "Sbires (Minions)",
     demon: "Démon",
     traveler: "Voyageurs",
   };
@@ -25,23 +25,40 @@ export function ScriptReference({
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-stone-950">
       <div className="flex items-center justify-between px-4 py-3 border-b border-stone-800">
-        <div className="flex items-center gap-2 text-amber-400 text-sm uppercase tracking-[0.2em]">
-          <BookOpen className="w-4 h-4" /> {script.name}
+        <div className="flex items-center gap-2 text-amber-400 text-base uppercase tracking-[0.2em] font-display">
+          <BookOpen className="w-5 h-5" /> {script.name}
         </div>
-        <button onClick={onClose} className="p-2 text-stone-400 hover:text-stone-100">
-          <X className="w-5 h-5" />
+        <button
+          onClick={onClose}
+          aria-label="Fermer"
+          className="p-2 text-stone-300 hover:text-stone-100"
+        >
+          <X className="w-6 h-6" />
         </button>
       </div>
-      <div className="flex-1 overflow-y-auto px-4 pb-8">
+      <div className="flex-1 overflow-y-auto px-4 pb-10 max-w-2xl w-full mx-auto">
         {teamOrder.map(team => {
           const roles = Object.entries(script.roles).filter(([, r]) => r.team === team);
           if (!roles.length) return null;
           const tc = TEAM_COLORS[team];
+          const desc = TEAM_DESCRIPTIONS[team];
           return (
-            <div key={team} className="mt-6">
-              <div className={`text-xs uppercase tracking-[0.3em] mb-3 ${tc.text} opacity-80`}>
-                {teamLabels[team]}
-              </div>
+            <section key={team} className="mt-7">
+              <header className="mb-3">
+                <div className={`flex items-center gap-2 ${tc.text}`}>
+                  <span className={`inline-block w-2.5 h-2.5 rounded-full ${tc.accent}`} />
+                  <h2 className="text-base uppercase tracking-[0.3em] font-display">
+                    {teamLabels[team]}
+                  </h2>
+                  <span className="text-stone-500 text-sm">· {roles.length}</span>
+                </div>
+                <p className={`mt-2 text-[15px] leading-snug ${tc.text} opacity-90`}>
+                  {desc.tagline}
+                </p>
+                <p className="mt-1 text-[14px] leading-relaxed text-stone-300">
+                  {desc.details}
+                </p>
+              </header>
               <div className="space-y-2">
                 {roles.map(([id, role]) => {
                   const open = expanded === id;
@@ -53,27 +70,31 @@ export function ScriptReference({
                       }`}
                       onClick={() => setExpanded(open ? null : id)}
                     >
-                      <div className="flex items-center gap-3 px-3 py-2.5">
-                        <RoleIcon roleId={id} size={32} className="flex-shrink-0" />
+                      <div className="flex items-center gap-3 px-3 py-3">
+                        <RoleIcon roleId={id} size={40} className="flex-shrink-0" />
                         <div className="flex-1 min-w-0">
-                          <span className={`text-sm italic ${open ? tc.text : "text-stone-200"}`}>
+                          <span className={`text-lg italic font-display ${open ? tc.text : "text-stone-100"}`}>
                             {role.name}
                           </span>
                           {!open && (
-                            <p className="text-xs text-stone-500 mt-0.5 line-clamp-1">{role.ability}</p>
+                            <p className="text-[13px] text-stone-400 mt-0.5 line-clamp-2 leading-snug">
+                              {role.ability}
+                            </p>
                           )}
                         </div>
                         {open ? (
-                          <ChevronUp className="w-3 h-3 text-stone-500 flex-shrink-0" />
+                          <ChevronUp className="w-4 h-4 text-stone-400 flex-shrink-0" />
                         ) : (
-                          <ChevronDown className="w-3 h-3 text-stone-500 flex-shrink-0" />
+                          <ChevronDown className="w-4 h-4 text-stone-400 flex-shrink-0" />
                         )}
                       </div>
                       {open && (
                         <div className="px-4 pb-4 pt-0">
-                          <p className="text-stone-300 text-sm leading-relaxed">{role.ability}</p>
+                          <p className="text-stone-200 text-[15px] leading-relaxed">
+                            {role.ability}
+                          </p>
                           {(role.firstNight || role.otherNight) && (
-                            <div className="mt-2 flex gap-3 text-xs text-stone-500">
+                            <div className="mt-3 flex gap-3 text-[12px] text-stone-500">
                               {role.firstNight && <span>1ère nuit : #{role.firstNight}</span>}
                               {role.otherNight && <span>Autres nuits : #{role.otherNight}</span>}
                             </div>
@@ -84,7 +105,7 @@ export function ScriptReference({
                   );
                 })}
               </div>
-            </div>
+            </section>
           );
         })}
       </div>
