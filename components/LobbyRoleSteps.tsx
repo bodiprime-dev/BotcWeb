@@ -2,10 +2,11 @@
 import { useState } from "react";
 import { BookOpen, ChevronDown, ChevronUp } from "lucide-react";
 import { SCRIPTS, TEAM_COLORS, type Team } from "@/data/scripts";
+import { getRoleQuotas } from "@/lib/game";
 import type { GameState, GameAction } from "@/lib/types";
 import { RoleIcon } from "./RoleIcon";
 
-export type LobbyStep = "players" | "roles" | "drunk" | "lunatic" | "lunatic-bluffs" | "bluffs";
+export type LobbyStep = "players" | "roles" | "drunk" | "lunatic" | "lunatic-bluffs" | "bluffs" | "random-bluffs";
 
 export function LobbyRoleSteps({
   game,
@@ -30,6 +31,10 @@ export function LobbyRoleSteps({
   const [lunaticFakeDemonId, setLunaticFakeDemonId] = useState<string | null>(null);
   const [lunaticBluffRoleIds, setLunaticBluffRoleIds] = useState<string[]>([]);
   const [demonBluffRoleIds, setDemonBluffRoleIds] = useState<string[]>([]);
+  // Étape random-bluffs : la coche "tirer au sort" est cochée par défaut
+  // pour préserver le comportement actuel d'un clic sur "Lancer aléatoire".
+  const [randomBluffsAuto, setRandomBluffsAuto] = useState(true);
+  const [randomBluffRoleIds, setRandomBluffRoleIds] = useState<string[]>([]);
 
   // Au-delà de 15 joueurs, les surnuméraires sont des Voyageurs : on inclut alors
   // la section Voyageurs dans le wizard pour permettre la sélection manuelle.
@@ -85,6 +90,21 @@ export function LobbyRoleSteps({
     .map(([id, r]) => ({ id, ...r }));
 
   if (step === "roles") {
+    const quotas = getRoleQuotas(playableCount, selectedRoleIds);
+    const teamQuota: Record<Team, number | null> = {
+      townsfolk: quotas.townsfolk,
+      outsider: quotas.outsiders,
+      minion: quotas.minions,
+      demon: quotas.demons,
+      traveler: null,
+    };
+    const teamCurrent: Record<Team, number> = {
+      townsfolk: 0, outsider: 0, minion: 0, demon: 0, traveler: 0,
+    };
+    for (const id of selectedRoleIds) {
+      const t = script.roles[id]?.team;
+      if (t) teamCurrent[t]++;
+    }
     return (
       <div className="mb-4">
         <div className="flex items-center justify-between mb-4">
@@ -99,13 +119,57 @@ export function LobbyRoleSteps({
             {selectedRoleIds.length}/{playableCount}
           </div>
         </div>
+        <div className="bg-stone-900/60 ring-1 ring-stone-800 p-3 mb-4">
+          <div className="text-stone-500 text-[10px] uppercase tracking-[0.2em] mb-2">
+            Quotas recommandés{selectedRoleIds.includes("baron") ? " · 🎩 Baron : +2 Outsiders / −2 Townsfolk" : ""}
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {(["townsfolk", "outsider", "minion", "demon"] as Team[]).map(team => {
+              const tc = TEAM_COLORS[team];
+              const target = teamQuota[team] ?? 0;
+              const current = teamCurrent[team];
+              const ok = current === target;
+              const over = current > target;
+              return (
+                <div key={team} className={`px-2 py-1.5 ring-1 ${
+                  ok ? `${tc.ring} bg-stone-900` : "ring-stone-800 bg-stone-950"
+                }`}>
+                  <div className={`text-[10px] uppercase tracking-[0.15em] ${tc.text} opacity-70`}>
+                    {teamLabels[team]}
+                  </div>
+                  <div className={`text-sm font-medium ${
+                    ok ? tc.text : over ? "text-red-400" : "text-stone-400"
+                  }`}>
+                    {current}/{target}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {quotas.travelers > 0 && (
+            <div className="text-stone-500 text-[11px] mt-2 italic">
+              + {quotas.travelers} Voyageur(s) (joueurs au-delà de 15).
+            </div>
+          )}
+        </div>
         {teamOrder.map(team => {
           const roles = Object.entries(script.roles).filter(([, r]) => r.team === team);
           if (!roles.length) return null;
           const tc = TEAM_COLORS[team];
+          const target = teamQuota[team];
+          const current = teamCurrent[team];
           return (
             <div key={team} className="mb-4">
-              <div className={`text-xs uppercase tracking-[0.3em] mb-2 ${tc.text} opacity-70`}>{teamLabels[team]}</div>
+              <div className="flex items-baseline justify-between mb-2">
+                <div className={`text-xs uppercase tracking-[0.3em] ${tc.text} opacity-70`}>{teamLabels[team]}</div>
+                {target !== null && (
+                  <div className={`text-[11px] tabular-nums ${
+                    current === target ? tc.text : current > target ? "text-red-400" : "text-stone-500"
+                  }`}>
+                    {current}/{target}
+                  </div>
+                )}
+              </div>
               <div className="space-y-1">
                 {roles.map(([id, role]) => {
                   const checked = selectedRoleIds.includes(id);
@@ -412,6 +476,108 @@ export function LobbyRoleSteps({
             className="flex-grow-[2] p-3 bg-red-900 hover:bg-red-800 disabled:bg-stone-800 disabled:text-stone-600 text-stone-100 ring-1 ring-red-700/50 disabled:ring-stone-700 tracking-[0.2em] uppercase text-sm transition-all"
           >
             {demonBluffRoleIds.length === 3 ? "Confirmer et lancer" : `${3 - demonBluffRoleIds.length} bluff(s) manquant(s)`}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === "random-bluffs") {
+    // En mode aléatoire on ignore selectedRoleIds : tous les townsfolk sont
+    // candidats comme bluffs (les bluffs choisis seront retirés du pool aléatoire
+    // côté reducer pour garantir qu'ils restent absents du jeu).
+    const randomBluffCandidates = Object.entries(script.roles)
+      .filter(([, r]) => r.team === "townsfolk")
+      .map(([id, r]) => ({ id, ...r }));
+    const canLaunch = randomBluffsAuto || randomBluffRoleIds.length === 3;
+    return (
+      <div className="mb-4">
+        <div className="bg-red-950/40 ring-1 ring-red-800/40 p-4 mb-6">
+          <div className="text-red-400 text-sm font-medium mb-2">😈 Bluffs du Démon (rôles aléatoires)</div>
+          <p className="text-stone-300 text-sm leading-relaxed">
+            Tu peux pré-choisir <strong>3 rôles Townsfolk</strong> comme bluffs du Démon —
+            ils seront garantis absents du jeu. Sinon, coche l'option ci-dessous pour les tirer au sort.
+          </p>
+        </div>
+        <button
+          onClick={() => setRandomBluffsAuto(v => !v)}
+          className={`w-full flex items-center gap-3 p-3 mb-4 ring-1 text-left transition-all ${
+            randomBluffsAuto
+              ? "bg-stone-800 ring-amber-700/60 text-amber-200"
+              : "bg-stone-900 ring-stone-700 text-stone-400 hover:ring-stone-600"
+          }`}
+        >
+          <div className={`w-4 h-4 flex-shrink-0 border-2 flex items-center justify-center transition-all ${
+            randomBluffsAuto ? "bg-amber-700 border-amber-600" : "border-stone-600"
+          }`}>
+            {randomBluffsAuto && <span className="text-[10px] font-bold text-white leading-none">✓</span>}
+          </div>
+          <div>
+            <div className="text-sm">Tirer les bluffs au sort</div>
+            <div className="text-xs text-stone-500 mt-0.5">
+              Décoche pour choisir manuellement les 3 bluffs ci-dessous.
+            </div>
+          </div>
+        </button>
+        {!randomBluffsAuto && (
+          <>
+            <div className="text-stone-400 text-xs uppercase tracking-[0.2em] mb-3 flex items-center justify-between">
+              <span>Rôles disponibles comme bluffs</span>
+              <span className={randomBluffRoleIds.length === 3 ? "text-amber-400" : "text-stone-500"}>
+                {randomBluffRoleIds.length}/3
+              </span>
+            </div>
+            <div className="space-y-2 mb-6">
+              {randomBluffCandidates.map(role => {
+                const tc = TEAM_COLORS.townsfolk;
+                const sel = randomBluffRoleIds.includes(role.id);
+                const disabled = !sel && randomBluffRoleIds.length >= 3;
+                return (
+                  <button
+                    key={role.id}
+                    onClick={() => {
+                      if (sel) setRandomBluffRoleIds(prev => prev.filter(x => x !== role.id));
+                      else if (!disabled) setRandomBluffRoleIds(prev => [...prev, role.id]);
+                    }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 ring-1 text-left transition-all ${
+                      sel ? `bg-stone-800/70 ring-red-700/60 ${tc.text}`
+                      : disabled ? "bg-stone-950 ring-stone-800 text-stone-600 cursor-not-allowed"
+                      : "bg-stone-900 ring-stone-800 text-stone-300 hover:ring-stone-600"
+                    }`}
+                  >
+                    <div className={`w-4 h-4 flex-shrink-0 border flex items-center justify-center text-[10px] font-bold transition-all ${
+                      sel ? "bg-red-800 border-transparent text-stone-100" : "border-stone-600 bg-transparent"
+                    }`}>
+                      {sel && "✓"}
+                    </div>
+                    <RoleIcon roleId={role.id} size={28} className="flex-shrink-0" />
+                    <div>
+                      <div className="text-sm italic">{role.name}</div>
+                      <div className="text-xs text-stone-500 line-clamp-1 mt-0.5">{role.ability}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
+        <div className="flex gap-2">
+          <button
+            onClick={() => { setStep("players"); setRandomBluffRoleIds([]); setRandomBluffsAuto(true); }}
+            className="flex-1 p-3 bg-stone-900 ring-1 ring-stone-700 text-stone-400 text-sm"
+          >
+            ← Annuler
+          </button>
+          <button
+            onClick={() => launchGame([], null, null, [], randomBluffsAuto ? [] : randomBluffRoleIds)}
+            disabled={!canLaunch}
+            className="flex-grow-[2] p-3 bg-red-900 hover:bg-red-800 disabled:bg-stone-800 disabled:text-stone-600 text-stone-100 ring-1 ring-red-700/50 disabled:ring-stone-700 tracking-[0.2em] uppercase text-sm transition-all"
+          >
+            {randomBluffsAuto
+              ? "Lancer (bluffs aléatoires)"
+              : randomBluffRoleIds.length === 3
+                ? "Lancer la partie"
+                : `${3 - randomBluffRoleIds.length} bluff(s) manquant(s)`}
           </button>
         </div>
       </div>
