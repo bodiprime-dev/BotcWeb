@@ -3,7 +3,7 @@ import type { GameState, GameAction, Player, PlayerView, RoleInfoEntry, Nominati
 import { SCRIPTS, type Script } from "@/data/scripts";
 
 // Répartition officielle Blood on the Clocktower par nombre de joueurs
-const ROLE_DISTRIBUTION: Record<number, { townsfolk: number; outsiders: number; minions: number; demons: number }> = {
+export const ROLE_DISTRIBUTION: Record<number, { townsfolk: number; outsiders: number; minions: number; demons: number }> = {
    5: { townsfolk: 3, outsiders: 0, minions: 1, demons: 1 },
    6: { townsfolk: 4, outsiders: 0, minions: 1, demons: 1 },
    7: { townsfolk: 5, outsiders: 0, minions: 1, demons: 1 },
@@ -16,6 +16,25 @@ const ROLE_DISTRIBUTION: Record<number, { townsfolk: number; outsiders: number; 
   14: { townsfolk: 9, outsiders: 1, minions: 3, demons: 1 },
   15: { townsfolk: 9, outsiders: 2, minions: 3, demons: 1 },
 };
+
+// Quotas attendus par équipe pour `playerCount` joueurs, en tenant compte
+// des setup-modifiers présents dans `selectedRoleIds` (Baron : +2 Outsiders / -2 Townsfolk).
+// Au-delà de 15, les surnuméraires sont des Voyageurs.
+export function getRoleQuotas(playerCount: number, selectedRoleIds: string[]): {
+  townsfolk: number; outsiders: number; minions: number; demons: number; travelers: number;
+} {
+  const standardCount = Math.min(playerCount, 15);
+  const travelers = Math.max(0, playerCount - 15);
+  const base = ROLE_DISTRIBUTION[standardCount] ?? ROLE_DISTRIBUTION[15];
+  let outsiders = base.outsiders;
+  let townsfolk = base.townsfolk;
+  if (selectedRoleIds.includes("baron")) {
+    const shift = Math.min(2, townsfolk);
+    outsiders += shift;
+    townsfolk -= shift;
+  }
+  return { townsfolk, outsiders, minions: base.minions, demons: base.demons, travelers };
+}
 
 export function createNewGame(scriptId: string): GameState {
   const code = generateCode();
@@ -390,6 +409,13 @@ export function applyAction(state: GameState, action: GameAction): GameState {
         const byTeam: Record<string, string[]> = { townsfolk: [], outsider: [], minion: [], demon: [], traveler: [] };
         for (const [id, role] of Object.entries(script.roles)) {
           byTeam[role.team]?.push(id);
+        }
+        // Si le GM a pré-choisi des bluffs du Démon en mode aléatoire, on les
+        // retire du pool de Townsfolk tirables : un bluff doit être un rôle
+        // absent du jeu.
+        const reservedBluffs = new Set(action.demonBluffRoleIds ?? []);
+        if (reservedBluffs.size > 0) {
+          byTeam.townsfolk = byTeam.townsfolk.filter(id => !reservedBluffs.has(id));
         }
         // Au-delà de 15 sans Voyageur dans le script, on refuse le démarrage.
         if (travelerCount > 0 && byTeam.traveler.length === 0) return state;

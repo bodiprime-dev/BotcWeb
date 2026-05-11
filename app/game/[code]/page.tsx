@@ -288,7 +288,7 @@ function Lobby({ game, me, dispatch, onLeave }: {
               <BookOpen className="w-4 h-4" /> Configurer les rôles
             </button>
             <button
-              onClick={() => dispatch({ type: "START_GAME", storytellerId: me.id, selectedRoleIds: [], prefillRoleInfo })}
+              onClick={() => setStep("random-bluffs")}
               className="w-full p-4 bg-red-900/60 hover:bg-red-900 text-stone-300 hover:text-stone-100 ring-1 ring-red-900/50 tracking-[0.2em] uppercase text-xs transition-all"
             >
               Lancer avec rôles aléatoires
