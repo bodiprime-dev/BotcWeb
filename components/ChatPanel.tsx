@@ -15,8 +15,28 @@ export function ChatPanel({
   const [open, setOpen] = useState(false);
   const [target, setTarget] = useState<string | "all">("all");
   const [text, setText] = useState("");
+  // Timestamp du dernier marquage "lu" persistant (localStorage), par partie + joueur.
+  // Initialisé à 0 côté SSR — corrigé après hydratation pour éviter les mismatches.
+  const [lastReadAt, setLastReadAt] = useState<number>(0);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
+  const storageKey = `bot:${game.code}:chatRead:${me.id}`;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem(storageKey);
+    if (stored) setLastReadAt(parseInt(stored, 10) || 0);
+  }, [storageKey]);
+
+  // Messages que je suis autorisé à voir.
+  const relevantMessages = useMemo(() => {
+    if (me.isStoryteller) return game.chat;
+    return game.chat.filter(m =>
+      m.toId === "all" || m.fromId === me.id || m.toId === me.id
+    );
+  }, [game.chat, me.id, me.isStoryteller]);
+
+  // Messages affichés dans l'onglet courant.
   const filtered = useMemo(() => {
     if (target === "all") return game.chat.filter(m => m.toId === "all");
     return game.chat.filter(m =>
@@ -31,9 +51,25 @@ export function ChatPanel({
     }
   }, [open, filtered.length]);
 
-  const totalUnread = me.isStoryteller
-    ? game.chat.length
-    : game.chat.filter(m => m.toId === "all" || m.fromId === me.id || m.toId === me.id).length;
+  // Tant que le panneau est ouvert, marquer comme lu chaque fois qu'un nouveau
+  // message arrive (évite de garder le compteur à 0 à la fermeture si des messages
+  // sont arrivés pendant la lecture).
+  useEffect(() => {
+    if (!open) return;
+    if (typeof window === "undefined") return;
+    const now = Date.now();
+    setLastReadAt(now);
+    window.localStorage.setItem(storageKey, String(now));
+  }, [open, game.chat.length, storageKey]);
+
+  const totalUnread = useMemo(
+    () => relevantMessages.filter(m => m.at > lastReadAt && m.fromId !== me.id).length,
+    [relevantMessages, lastReadAt, me.id]
+  );
+
+  // Le chat est désactivé tant que le GM ne l'a pas activé.
+  // (Hooks déclarés avant ce return pour respecter les règles React.)
+  if (!game.chatEnabled) return null;
 
   const players = game.players.filter(p => p.id !== me.id);
 

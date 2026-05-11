@@ -41,6 +41,29 @@ export function RoleInfoDisplay({
                   </div>
                 </div>
               );
+            case "evil_team":
+              return (
+                <div key={i}>
+                  <div className="text-xs text-rose-300/80 uppercase tracking-wider mb-2">
+                    {entry.label}
+                  </div>
+                  <div className="space-y-1.5">
+                    {entry.teammates.map(t => (
+                      <div key={t.playerId} className="flex items-center gap-2 bg-rose-950/40 ring-1 ring-rose-800/40 px-2 py-1.5">
+                        <RoleIcon roleId={t.roleId} size={28} />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm text-rose-100 font-medium leading-tight">
+                            {getPlayerName(t.playerId)}
+                          </div>
+                          <div className="text-[11px] text-rose-300/70 italic leading-tight">
+                            {script.roles[t.roleId]?.name ?? t.roleId}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
             case "two_players_one_role":
               if (entry.result !== undefined) {
                 return (

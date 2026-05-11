@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { BookOpen, ChevronDown, ChevronUp, Crown, Plus, RotateCcw, Users, X } from "lucide-react";
+import { BookOpen, ChevronDown, ChevronUp, Crown, MessageCircle, Plus, RotateCcw, Users, X } from "lucide-react";
 import { SCRIPTS, TEAM_COLORS, type Team, getScriptList } from "@/data/scripts";
 import { applyAction, createNewGame } from "@/lib/game";
 import type { GameState, GameAction } from "@/lib/types";
@@ -277,6 +277,27 @@ function SimLobby({ game, me, dispatch, prefillRoleInfo }: {
 
       {canStart && step === "players" && (
         <>
+          <button
+            onClick={() => dispatch({ type: "SET_CHAT_ENABLED", storytellerId: game.players[0].id, enabled: !game.chatEnabled })}
+            className={`w-full flex items-center gap-3 p-3 mb-3 ring-1 text-left transition-all ${
+              game.chatEnabled
+                ? "bg-stone-800 ring-emerald-700/60 text-emerald-200"
+                : "bg-stone-900 ring-stone-700 text-stone-400 hover:ring-stone-600"
+            }`}
+          >
+            <div className={`w-4 h-4 flex-shrink-0 border-2 flex items-center justify-center transition-all ${
+              game.chatEnabled ? "bg-emerald-700 border-emerald-600" : "border-stone-600"
+            }`}>
+              {game.chatEnabled && <span className="text-[10px] font-bold text-white leading-none">✓</span>}
+            </div>
+            <MessageCircle className="w-4 h-4 flex-shrink-0 opacity-70" />
+            <div>
+              <div className="text-sm">Activer le chat en partie</div>
+              <div className="text-xs text-stone-500 mt-0.5">
+                Désactivé par défaut. Quand activé, les joueurs peuvent chuchoter et discuter en public.
+              </div>
+            </div>
+          </button>
           <button
             onClick={() => setStep("roles")}
             className="w-full p-4 bg-stone-800 hover:bg-stone-700 text-stone-100 ring-1 ring-stone-600 tracking-[0.2em] uppercase text-sm mb-3 flex items-center justify-center gap-2"

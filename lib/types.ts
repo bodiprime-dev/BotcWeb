@@ -11,7 +11,12 @@ export type RoleInfoEntry =
   | { kind: "player_and_role"; playerId: string; roleId: string; label?: string }
   | { kind: "role_list"; roleIds: string[] }
   | { kind: "count"; label: string; value: number }
-  | { kind: "text"; content: string };
+  | { kind: "text"; content: string }
+  // Coéquipiers maléfiques (perspective Démon ou Sbire) : liste de
+  // { joueur, rôle } à révéler. Utilisé pour le réveil collectif des
+  // Maléfiques en première nuit (le Démon voit ses Sbires, chaque Sbire
+  // voit le Démon et les autres Sbires).
+  | { kind: "evil_team"; label: string; teammates: { playerId: string; roleId: string }[] };
 
 // ─── Player ────────────────────────────────────────────────────────────────
 
@@ -83,6 +88,8 @@ export interface GameState {
   // Secrets serveur — ne sortent JAMAIS du serveur (purgés par redactStateFor).
   // Map playerId → token aléatoire utilisé pour authentifier les requêtes.
   secrets: Record<string, string>;
+  // Chat global activé ? Configuré par le GM dans le lobby. Par défaut désactivé.
+  chatEnabled: boolean;
 }
 
 // ─── PlayerView ────────────────────────────────────────────────────────────
@@ -120,4 +127,5 @@ export type GameAction =
   | { type: "TOGGLE_NIGHT_DONE"; storytellerId: string; playerId: string }
   | { type: "SLAYER_SHOOT"; shooterId: string; targetId: string }
   | { type: "SEND_CHAT"; fromId: string; toId: string | "all"; text: string }
+  | { type: "SET_CHAT_ENABLED"; storytellerId: string; enabled: boolean }
   | { type: "EXILE_TRAVELER"; storytellerId: string; playerId: string };

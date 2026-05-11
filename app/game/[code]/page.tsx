@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, BookOpen, ChevronDown, ChevronUp, Crown, Users, UserPlus } from "lucide-react";
+import { ArrowLeft, BookOpen, ChevronDown, ChevronUp, Crown, MessageCircle, Users, UserPlus } from "lucide-react";
 import { SCRIPTS } from "@/data/scripts";
 import { getPusherClient, channelName } from "@/lib/pusher-client";
 import type { GameState, GameAction } from "@/lib/types";
@@ -37,7 +37,7 @@ export default function GamePage() {
       const url = playerId
         ? `/api/game/${code}?playerId=${encodeURIComponent(playerId)}`
         : `/api/game/${code}`;
-      fetch(url)
+      fetch(url, { cache: "no-store" })
         .then(res => {
           if (res.status === 404) throw new Error("Partie introuvable");
           return res.json();
@@ -45,12 +45,24 @@ export default function GamePage() {
         .then(data => { if (mounted && data.state) setGame(data.state); })
         .catch(e => { if (mounted) setError(e.message); });
     };
+    // Si Pusher manque un événement (déconnexion, mise en veille de l'onglet,
+    // suspension mobile…), on resynchronise dès que l'onglet redevient actif
+    // ou prend le focus. Évite d'avoir à faire F5 manuellement.
+    const onVisible = () => { if (document.visibilityState === "visible") refetch(); };
+    const onFocus = () => refetch();
+    const onConnected = () => refetch();
     channel.bind("state-changed", refetch);
+    pusher.connection.bind("connected", onConnected);
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onFocus);
     refetch();
     return () => {
       mounted = false;
       channel.unbind_all();
       pusher.unsubscribe(channelName(code));
+      pusher.connection.unbind("connected", onConnected);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onFocus);
     };
   }, [code, playerId]);
 
@@ -230,7 +242,7 @@ function Lobby({ game, me, dispatch, onLeave }: {
             </div>
             <button
               onClick={() => setPrefillRoleInfo(v => !v)}
-              className={`w-full flex items-center gap-3 p-3 mb-4 ring-1 text-left transition-all ${
+              className={`w-full flex items-center gap-3 p-3 mb-3 ring-1 text-left transition-all ${
                 prefillRoleInfo
                   ? "bg-stone-800 ring-indigo-700/60 text-indigo-200"
                   : "bg-stone-900 ring-stone-700 text-stone-400 hover:ring-stone-600"
@@ -245,6 +257,27 @@ function Lobby({ game, me, dispatch, onLeave }: {
                 <div className="text-sm">Pré-remplir les infos de rôle</div>
                 <div className="text-xs text-stone-500 mt-0.5">
                   Génère automatiquement bluffs, lavandière, grand-mère… au lancement
+                </div>
+              </div>
+            </button>
+            <button
+              onClick={() => dispatch({ type: "SET_CHAT_ENABLED", storytellerId: me.id, enabled: !game.chatEnabled })}
+              className={`w-full flex items-center gap-3 p-3 mb-4 ring-1 text-left transition-all ${
+                game.chatEnabled
+                  ? "bg-stone-800 ring-emerald-700/60 text-emerald-200"
+                  : "bg-stone-900 ring-stone-700 text-stone-400 hover:ring-stone-600"
+              }`}
+            >
+              <div className={`w-4 h-4 flex-shrink-0 border-2 flex items-center justify-center transition-all ${
+                game.chatEnabled ? "bg-emerald-700 border-emerald-600" : "border-stone-600"
+              }`}>
+                {game.chatEnabled && <span className="text-[10px] font-bold text-white leading-none">✓</span>}
+              </div>
+              <MessageCircle className="w-4 h-4 flex-shrink-0 opacity-70" />
+              <div>
+                <div className="text-sm">Activer le chat en partie</div>
+                <div className="text-xs text-stone-500 mt-0.5">
+                  Désactivé par défaut. Quand activé, les joueurs peuvent chuchoter et discuter en public.
                 </div>
               </div>
             </button>
