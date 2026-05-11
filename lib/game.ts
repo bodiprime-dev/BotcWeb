@@ -38,6 +38,7 @@ export function createNewGame(scriptId: string): GameState {
     winner: null,
     winReason: null,
     secrets: {},
+    chatEnabled: false,
   };
 }
 
@@ -197,6 +198,7 @@ function pickLunaticBluffs(
 
 function buildRoleInfo(
   roleId: string,
+  selfId: string,
   allPlayers: Player[],
   script: Script,
   demonBluffs: [string, string, string] | null,
@@ -205,20 +207,51 @@ function buildRoleInfo(
   const shuffle = <T>(arr: T[]): T[] => [...arr].sort(() => Math.random() - 0.5);
 
   const nonSt = allPlayers.filter(p => !p.isStoryteller && p.role);
+  const team = script.roles[roleId]?.team;
+
+  // ─── Démons : bluffs + identités des Sbires + Lunatique ─────────────────
+  // Tous les Démons (TB, BMR, futurs scripts) suivent la même logique :
+  // ils apprennent leurs Sbires et reçoivent 3 bluffs.
+  if (team === "demon") {
+    const entries: RoleInfoEntry[] = [];
+    if (demonBluffs) entries.push({ kind: "bluffs", roleIds: demonBluffs });
+    const minions = nonSt
+      .filter(p => script.roles[p.role!]?.team === "minion")
+      .map(p => ({ playerId: p.id, roleId: p.role! }));
+    if (minions.length > 0) {
+      entries.push({ kind: "evil_team", label: "Tes Sbires", teammates: minions });
+    }
+    const lunaticPlayer = nonSt.find(p => p.role === "lunatic");
+    if (lunaticPlayer) {
+      entries.push({ kind: "player_and_role", playerId: lunaticPlayer.id, roleId: "lunatic" });
+    }
+    return entries;
+  }
+
+  // ─── Sbires : voient le Démon et leurs collègues Sbires ─────────────────
+  // Certains Sbires (ex: Parrain) ont en plus une info propre à leur rôle :
+  // on chaîne les deux ensembles d'entrées.
+  if (team === "minion") {
+    const entries: RoleInfoEntry[] = [];
+    const teammates = nonSt
+      .filter(p =>
+        p.id !== selfId &&
+        (script.roles[p.role!]?.team === "demon" || script.roles[p.role!]?.team === "minion")
+      )
+      .map(p => ({ playerId: p.id, roleId: p.role! }));
+    if (teammates.length > 0) {
+      entries.push({ kind: "evil_team", label: "Ton équipe maléfique", teammates });
+    }
+    if (roleId === "godfather") {
+      const outsiderIds = nonSt
+        .filter(p => script.roles[p.role!]?.team === "outsider")
+        .map(p => p.role!);
+      entries.push({ kind: "role_list", roleIds: outsiderIds });
+    }
+    return entries;
+  }
 
   switch (roleId) {
-    // ─── Démons : reçoivent les bluffs + identité du Lunatique s'il y en a un ──
-    case "imp":
-    case "pukka":
-    case "zombuul":
-    case "shabaloth":
-    case "po": {
-      const entries: RoleInfoEntry[] = [];
-      if (demonBluffs) entries.push({ kind: "bluffs", roleIds: demonBluffs });
-      const lunaticPlayer = allPlayers.find(p => p.role === "lunatic");
-      if (lunaticPlayer) entries.push({ kind: "player_and_role", playerId: lunaticPlayer.id, roleId: "lunatic" });
-      return entries;
-    }
 
     // ─── Lavandière : 1 joueur townsfolk parmi 2 ────────────────────
     case "washerwoman": {
@@ -269,14 +302,6 @@ function buildRoleInfo(
       if (goodOnes.length < 1) return [];
       const chosen = goodOnes[0];
       return [{ kind: "player_and_role", playerId: chosen.id, roleId: chosen.role! }];
-    }
-
-    // ─── Parrain : outsiders en jeu ──────────────────────────────────
-    case "godfather": {
-      const outsiderIds = nonSt
-        .filter(p => script.roles[p.role!]?.team === "outsider")
-        .map(p => p.role!);
-      return [{ kind: "role_list", roleIds: outsiderIds }];
     }
 
     // ─── Lunatique : reçoit ses propres bluffs (différents du démon) ──
@@ -413,16 +438,18 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       });
 
       // Passe 2 : calculer les infos de rôle (nécessite de connaître tous les rôles assignés)
-      // Les bluffs (Démon / Lunatique) sont TOUJOURS appliqués car le GM les a choisis.
+      // Les bluffs Démon, l'équipe maléfique (Démon + Sbires) et les bluffs du Lunatique
+      // sont TOUJOURS générés — ce sont les infos minimales nécessaires pour jouer.
       // Les autres infos de rôle (Lavandière, Grand-mère, etc.) ne sont générées que si
       // prefillRoleInfo !== false.
       const demonBluffs = pickDemonBluffs(script, assignedRoles, action.demonBluffRoleIds);
       const lunaticBluffs = pickLunaticBluffs(script, assignedRoles, demonBluffs, action.lunaticBluffRoleIds);
       const players = playersWithRoles.map((p) => {
         if (p.isStoryteller || !p.role) return p;
-        // Démon ou Lunatique : bluffs toujours assignés
-        const isBluffRole = p.role === "lunatic" || script.roles[p.role]?.team === "demon";
-        if (!isBluffRole && action.prefillRoleInfo === false) return p;
+        const pTeam = script.roles[p.role]?.team;
+        // Infos toujours générées : Démon, Sbires, Lunatique
+        const isAlwaysInfoRole = pTeam === "demon" || pTeam === "minion" || p.role === "lunatic";
+        if (!isAlwaysInfoRole && action.prefillRoleInfo === false) return p;
         if (p.role === "drunk" && p.displayRole) {
           // Drunk gets false info: generate for their fake role but with rotated player assignments
           const nonSt = playersWithRoles.filter(q => !q.isStoryteller && q.role);
@@ -430,9 +457,9 @@ export function applyAction(state: GameState, action: GameAction): GameState {
           const rotated = [roles[roles.length - 1], ...roles.slice(0, -1)];
           const falsePlayers = nonSt.map((q, i) => ({ ...q, role: rotated[i], displayRole: rotated[i] }));
           const infoPlayers = playersWithRoles.map(q => falsePlayers.find(f => f.id === q.id) ?? q);
-          return { ...p, roleInfo: buildRoleInfo(p.displayRole, infoPlayers, script, demonBluffs, lunaticBluffs) };
+          return { ...p, roleInfo: buildRoleInfo(p.displayRole, p.id, infoPlayers, script, demonBluffs, lunaticBluffs) };
         }
-        return { ...p, roleInfo: buildRoleInfo(p.role, playersWithRoles, script, demonBluffs, lunaticBluffs) };
+        return { ...p, roleInfo: buildRoleInfo(p.role, p.id, playersWithRoles, script, demonBluffs, lunaticBluffs) };
       });
 
       return {
@@ -672,6 +699,8 @@ export function applyAction(state: GameState, action: GameAction): GameState {
     }
 
     case "SEND_CHAT": {
+      // Chat verrouillé tant que le GM ne l'a pas activé.
+      if (!state.chatEnabled) return state;
       const sender = state.players.find(p => p.id === action.fromId);
       if (!sender) return state;
       const text = action.text.trim().slice(0, 500);
@@ -688,6 +717,14 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       // Cap à 200 messages pour éviter la croissance infinie
       const chat = [...state.chat, msg].slice(-200);
       return { ...state, chat };
+    }
+
+    case "SET_CHAT_ENABLED": {
+      // En lobby : le GM est state.players[0] (storytellerId pas encore défini).
+      // Une fois la partie lancée : c'est state.storytellerId qui fait foi.
+      const gmId = state.storytellerId ?? state.players[0]?.id ?? null;
+      if (gmId === null || action.storytellerId !== gmId) return state;
+      return { ...state, chatEnabled: action.enabled };
     }
 
     case "SLAYER_SHOOT": {

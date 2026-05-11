@@ -32,6 +32,7 @@ function isAuthorized(state: GameState, action: GameAction, callerId: string): b
     case "ADD_REMINDER":
     case "REMOVE_REMINDER":
     case "TOGGLE_NIGHT_DONE":
+    case "SET_CHAT_ENABLED":
       return isGM && action.storytellerId === callerId;
     case "NOMINATE":
       return action.nominatorId === callerId;
