@@ -334,6 +334,10 @@ function buildRoleInfo(
       return [];
     }
 
+    // ─── Oracle : compte les morts maléfiques chaque nuit — GM remplit ──
+    case "oracle":
+      return [{ kind: "count", label: "Morts maléfiques", value: 0 }];
+
     default:
       return [];
   }
