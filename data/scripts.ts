@@ -601,13 +601,6 @@ const BRUMES_DE_RAVENSWOOD: Script = {
       team: "outsider",
       ability: "Lorsque tu apprends ta mort, désigne publiquement un joueur : s'il est Bon, il meurt cette nuit. Capacité unique : tu n'as pas d'effet supplémentaire.",
     },
-    poisoner: {
-      name: "Poisoner",
-      team: "minion",
-      ability: "Chaque nuit, désigne un joueur : il est empoisonné jusqu'à la fin de la nuit suivante. Son pouvoir échoue et toutes les informations qu'il reçoit sont fausses (au choix du Conteur).",
-      firstNight: 17,
-      otherNight: 8,
-    },
     baron: {
       name: "Baron",
       team: "minion",
