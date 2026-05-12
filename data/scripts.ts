@@ -562,6 +562,18 @@ const BRUMES_DE_RAVENSWOOD: Script = {
       team: "townsfolk",
       ability: "Une fois par partie, le jour, déclare publiquement viser un joueur en te déclarant Slayer : si c'est le Démon, il meurt immédiatement. Sans effet si tu es ivre ou empoisonnée.",
     },
+    monk: {
+      name: "Monk",
+      team: "townsfolk",
+      ability: "Chaque nuit (sauf la 1re), désigne un autre joueur que toi : il est protégé du Démon cette nuit. Sa protection n'empêche pas les autres sources de mort.",
+      otherNight: 12,
+    },
+    juggler: {
+      name: "Juggler",
+      team: "townsfolk",
+      ability: "Le 1er jour, annonce publiquement autant de paires joueur+rôle que tu veux. La 1re nuit, tu apprends combien de tes devinettes étaient correctes.",
+      firstNight: 42,
+    },
     gossip: {
       name: "Gossip",
       team: "townsfolk",
@@ -610,6 +622,13 @@ const BRUMES_DE_RAVENSWOOD: Script = {
       name: "Scarlet Woman",
       team: "minion",
       ability: "Si le Démon meurt alors qu'il reste 5 joueurs vivants ou plus (Voyageurs exclus), tu deviens immédiatement le Démon et apprends quel rôle tu prends. Tu conserves ton alignement Maléfique.",
+    },
+    godfather: {
+      name: "Godfather",
+      team: "minion",
+      ability: "La 1re nuit, tu apprends la liste des Outsiders en jeu. Si un Outsider meurt durant le jour, désigne un joueur la nuit suivante : il meurt.",
+      firstNight: 18,
+      otherNight: 21,
     },
     witch: {
       name: "Witch",

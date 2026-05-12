@@ -338,6 +338,10 @@ function buildRoleInfo(
     case "oracle":
       return [{ kind: "count", label: "Morts maléfiques", value: 0 }];
 
+    // ─── Juggler : GM indique combien de paires du jour 1 étaient correctes ──
+    case "juggler":
+      return [{ kind: "count", label: "Paires correctes", value: 0 }];
+
     default:
       return [];
   }
