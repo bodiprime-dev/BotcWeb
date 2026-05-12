@@ -352,10 +352,163 @@ const BAD_MOON_RISING: Script = {
   },
 };
 
+// ─── Trouble Brewing + ─────────────────────────────────────────────────
+// TB revisité : Butler → Golem, Ravenkeeper → Town Crier.
+const TROUBLE_BREWING_PLUS: Script = {
+  id: "trouble-brewing-plus",
+  name: "Trouble Brewing +",
+  author: "Custom",
+  description: "Trouble Brewing revisité : le Butler remplacé par le Golem, le Ravenkeeper par le Town Crier.",
+  roles: {
+    washerwoman: {
+      name: "Washerwoman",
+      team: "townsfolk",
+      ability: "La 1re nuit, le Conteur te désigne 2 joueurs et un rôle Townsfolk précis : l'un de ces 2 joueurs détient ce rôle. Tu sais quel rôle, mais pas lequel des deux.",
+      firstNight: 33,
+    },
+    librarian: {
+      name: "Librarian",
+      team: "townsfolk",
+      ability: "La 1re nuit, le Conteur te désigne 2 joueurs et un rôle Outsider précis : l'un d'eux détient ce rôle — ou il t'apprend qu'aucun Outsider n'est en jeu.",
+      firstNight: 34,
+    },
+    investigator: {
+      name: "Investigator",
+      team: "townsfolk",
+      ability: "La 1re nuit, le Conteur te désigne 2 joueurs et un rôle de Sbire précis : l'un d'eux est ce Sbire. Tu sais quel rôle, mais pas lequel des deux.",
+      firstNight: 35,
+    },
+    chef: {
+      name: "Chef",
+      team: "townsfolk",
+      ability: "La 1re nuit, tu apprends combien de paires de joueurs Maléfiques sont assis côte à côte autour du cercle (0, 1, 2…). Deux Maléfiques séparés par un Bon ne forment pas une paire.",
+      firstNight: 36,
+    },
+    empath: {
+      name: "Empath",
+      team: "townsfolk",
+      ability: "Chaque nuit, tu apprends combien de tes deux voisins vivants les plus proches sont Maléfiques (0, 1 ou 2). Les joueurs morts entre vous sont ignorés.",
+      firstNight: 37,
+      otherNight: 53,
+    },
+    fortuneteller: {
+      name: "Fortune Teller",
+      team: "townsfolk",
+      ability: "Chaque nuit, désigne 2 joueurs : tu apprends si OUI ou NON l'un d'eux est le Démon. Un joueur Bon précis est ton Red Herring : il déclenche aussi un OUI s'il fait partie des deux désignés.",
+      firstNight: 38,
+      otherNight: 54,
+    },
+    undertaker: {
+      name: "Undertaker",
+      team: "townsfolk",
+      ability: "Chaque nuit (sauf la 1re), tu apprends le rôle du joueur exécuté aujourd'hui. Si aucune exécution n'a eu lieu, tu ne reçois rien.",
+      otherNight: 55,
+    },
+    monk: {
+      name: "Monk",
+      team: "townsfolk",
+      ability: "Chaque nuit (sauf la 1re), désigne un autre joueur que toi : il est protégé du Démon cette nuit. Sa protection n'empêche pas les autres sources de mort.",
+      otherNight: 12,
+    },
+    towncrier: {
+      name: "Town Crier",
+      team: "townsfolk",
+      ability: "Chaque nuit (sauf la 1re), tu apprends si un Sbire a nominé quelqu'un durant le jour. Oui ou Non.",
+      otherNight: 57,
+    },
+    virgin: {
+      name: "Virgin",
+      team: "townsfolk",
+      ability: "La 1re fois que tu es nominée, si le nominateur est un Townsfolk, il est exécuté immédiatement (la nomination ne se poursuit pas). Tu perds ensuite ta capacité, qu'elle ait déclenché ou non.",
+    },
+    slayer: {
+      name: "Slayer",
+      team: "townsfolk",
+      ability: "Une fois par partie, le jour, déclare publiquement viser un joueur en te déclarant Slayer : si c'est le Démon, il meurt immédiatement. Sans effet si tu es ivre ou empoisonnée.",
+    },
+    soldier: {
+      name: "Soldier",
+      team: "townsfolk",
+      ability: "Tu es immunisé contre la capacité offensive du Démon : il ne peut pas te tuer la nuit. Les autres causes de mort (exécution, Sbires, Voyageurs…) restent normales.",
+    },
+    mayor: {
+      name: "Mayor",
+      team: "townsfolk",
+      ability: "Si seuls 3 joueurs sont vivants à la fin du jour sans aucune exécution, le Bien gagne. De plus, si tu mourrais la nuit, le Conteur peut faire mourir un autre joueur à ta place.",
+    },
+    golem: {
+      name: "Golem",
+      team: "outsider",
+      ability: "Tu ne peux nominer qu'une seule fois par partie. Si tu nomines le Démon, il meurt sur le coup (même si d'autres effets l'en empêcheraient normalement).",
+    },
+    drunk: {
+      name: "Drunk",
+      team: "outsider",
+      ability: "Tu ignores que tu es ivre. Tu te crois être un Townsfolk précis et tu joues comme tel, mais ton pouvoir ne fonctionne pas et toutes les informations que tu reçois sont fausses.",
+    },
+    recluse: {
+      name: "Recluse",
+      team: "outsider",
+      ability: "Tu es Bon, mais tu peux apparaître comme un Sbire ou comme le Démon vis-à-vis des autres pouvoirs (Enquêteur, Devin, Slayer…). Tu comptes toujours comme Bon pour la victoire.",
+    },
+    saint: {
+      name: "Saint",
+      team: "outsider",
+      ability: "Si tu es exécuté par vote, le Mal gagne immédiatement. Mourir d'une autre cause (Démon, Slayer, etc.) ne déclenche pas cet effet.",
+    },
+    poisoner: {
+      name: "Poisoner",
+      team: "minion",
+      ability: "Chaque nuit, désigne un joueur : il est empoisonné jusqu'à la fin de la nuit suivante. Son pouvoir échoue et toutes les informations qu'il reçoit sont fausses (au choix du Conteur).",
+      firstNight: 17,
+      otherNight: 8,
+    },
+    spy: {
+      name: "Spy",
+      team: "minion",
+      ability: "Chaque nuit, tu vois le Grimoire entier (rôles, alignements, marqueurs). Tu peux apparaître comme un Townsfolk ou un Outsider précis vis-à-vis des autres pouvoirs, et tu comptes comme Bon pour eux.",
+      firstNight: 48,
+      otherNight: 67,
+    },
+    scarletwoman: {
+      name: "Scarlet Woman",
+      team: "minion",
+      ability: "Si le Démon meurt alors qu'il reste 5 joueurs vivants ou plus (Voyageurs exclus), tu deviens immédiatement le Démon et apprends quel rôle tu prends. Tu conserves ton alignement Maléfique.",
+    },
+    baron: {
+      name: "Baron",
+      team: "minion",
+      ability: "Tant que tu es en jeu, la mise en place ajoute 2 Outsiders supplémentaires et retire 2 Townsfolk. Tu n'as pas d'autre pouvoir.",
+    },
+    imp: {
+      name: "Imp",
+      team: "demon",
+      ability: "Chaque nuit (sauf la 1re), désigne un joueur : il meurt. Si tu te désignes toi-même, tu meurs et un Sbire vivant (au choix du Conteur) devient l'Imp à ta place.",
+      otherNight: 24,
+    },
+    bureaucrat: {
+      name: "Bureaucrat",
+      team: "traveler",
+      ability: "Chaque jour, désigne secrètement un joueur : ses votes comptent triple aujourd'hui (Bon ou Mal indifféremment).",
+    },
+    thief: {
+      name: "Thief",
+      team: "traveler",
+      ability: "Chaque jour, désigne secrètement un joueur : ses votes comptent en négatif aujourd'hui (chaque OUI compte comme -1).",
+    },
+    scapegoat: {
+      name: "Scapegoat",
+      team: "traveler",
+      ability: "Si un joueur de ton alignement est exécuté, tu peux choisir de mourir à sa place. Sinon, tu n'as aucun autre pouvoir.",
+    },
+  },
+};
+
 // ─── Registre exporté ──────────────────────────────────────────────────
 export const SCRIPTS: Record<string, Script> = {
   "trouble-brewing": TROUBLE_BREWING,
   "bad-moon-rising": BAD_MOON_RISING,
+  "trouble-brewing-plus": TROUBLE_BREWING_PLUS,
 };
 
 // ─── Palette d'équipes ─────────────────────────────────────────────────
