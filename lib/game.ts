@@ -419,26 +419,62 @@ export function applyAction(state: GameState, action: GameAction): GameState {
         }
         // Au-delà de 15 sans Voyageur dans le script, on refuse le démarrage.
         if (travelerCount > 0 && byTeam.traveler.length === 0) return state;
-        // 1) On tire d'abord les minions et démon, puis on regarde si un setup-modifier
-        //    impose un ajustement (Baron : +2 Outsiders / -2 Townsfolk).
-        const minions = shuffle(byTeam.minion).slice(0, baseDist.minions);
-        const demons = shuffle(byTeam.demon).slice(0, baseDist.demons);
+
+        // Une sélection manuelle plus courte que le nombre de joueurs n'est plus
+        // ignorée : on conserve les rôles choisis par le GM et on ne tire que les
+        // places manquantes, équipe par équipe.
+        const picked = action.selectedRoleIds.filter(id => script.roles[id]).slice(0, playerCount);
+        const assigned: string[] = [...picked];
+        const used = new Set(picked);
+        const countIn = (team: string) => assigned.filter(id => script.roles[id]?.team === team).length;
+        // Tirage sans remise : un même rôle n'est jamais distribué deux fois.
+        const draw = (team: string, target: number) => {
+          const deficit = Math.min(target - countIn(team), playerCount - assigned.length);
+          if (deficit <= 0) return;
+          const pool = shuffle((byTeam[team] ?? []).filter(id => !used.has(id)));
+          for (const id of pool.slice(0, deficit)) {
+            assigned.push(id);
+            used.add(id);
+          }
+        };
+
+        // 1) Démon et Sbires d'abord : un setup-modifier (Baron : +2 Outsiders /
+        //    -2 Townsfolk) peut ensuite modifier la répartition du village.
+        draw("demon", baseDist.demons);
+        draw("minion", baseDist.minions);
         let outsiderCount = baseDist.outsiders;
         let townsfolkCount = baseDist.townsfolk;
-        if (minions.includes("baron")) {
+        if (assigned.includes("baron")) {
           const shift = Math.min(2, townsfolkCount, byTeam.outsider.length - outsiderCount);
           outsiderCount += shift;
           townsfolkCount -= shift;
         }
-        const outsiders = shuffle(byTeam.outsider).slice(0, outsiderCount);
-        const townsfolk = shuffle(byTeam.townsfolk).slice(0, townsfolkCount);
-        // Voyageurs : tirage avec remise si la liste est plus courte que travelerCount
-        const travelers: string[] = [];
-        for (let i = 0; i < travelerCount; i++) {
-          const pool = byTeam.traveler;
-          travelers.push(pool[Math.floor(Math.random() * pool.length)]);
+        draw("traveler", travelerCount);
+        draw("outsider", outsiderCount);
+        draw("townsfolk", townsfolkCount);
+
+        // Le script peut compter moins de Voyageurs distincts qu'il n'y a de
+        // places à pourvoir : on complète alors avec remise, deux Voyageurs
+        // identiques restant parfaitement jouables.
+        const addRandomTraveler = () => {
+          assigned.push(byTeam.traveler[Math.floor(Math.random() * byTeam.traveler.length)]);
+        };
+        while (byTeam.traveler.length > 0 && countIn("traveler") < travelerCount && assigned.length < playerCount) {
+          addRandomTraveler();
         }
-        assignedRoles = shuffle([...townsfolk, ...outsiders, ...minions, ...demons, ...travelers]);
+
+        // Filet de sécurité : s'il reste des places (script pauvre en rôles d'une
+        // équipe, ou sélection manuelle déséquilibrée), on complète avec ce qui
+        // reste dans les pools, puis en dernier recours avec des Voyageurs.
+        for (const team of ["townsfolk", "outsider", "minion", "traveler"]) {
+          if (assigned.length >= playerCount) break;
+          draw(team, countIn(team) + (playerCount - assigned.length));
+        }
+        while (assigned.length < playerCount && byTeam.traveler.length > 0) {
+          addRandomTraveler();
+        }
+
+        assignedRoles = shuffle(assigned);
       }
 
       // Passe 1 : assigner les rôles (sans roleInfo encore)

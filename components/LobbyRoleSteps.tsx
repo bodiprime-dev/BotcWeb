@@ -96,7 +96,7 @@ export function LobbyRoleSteps({
       outsider: quotas.outsiders,
       minion: quotas.minions,
       demon: quotas.demons,
-      traveler: null,
+      traveler: quotas.travelers > 0 ? quotas.travelers : null,
     };
     const teamCurrent: Record<Team, number> = {
       townsfolk: 0, outsider: 0, minion: 0, demon: 0, traveler: 0,
@@ -124,7 +124,7 @@ export function LobbyRoleSteps({
             Quotas recommandés{selectedRoleIds.includes("baron") ? " · 🎩 Baron : +2 Outsiders / −2 Townsfolk" : ""}
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {(["townsfolk", "outsider", "minion", "demon"] as Team[]).map(team => {
+            {teamOrder.map(team => {
               const tc = TEAM_COLORS[team];
               const target = teamQuota[team] ?? 0;
               const current = teamCurrent[team];
@@ -148,7 +148,8 @@ export function LobbyRoleSteps({
           </div>
           {quotas.travelers > 0 && (
             <div className="text-stone-500 text-[11px] mt-2 italic">
-              + {quotas.travelers} Voyageur(s) (joueurs au-delà de 15).
+              Les {quotas.travelers} joueur(s) au-delà de 15 jouent en Voyageur. Non choisis,
+              ils sont tirés au sort.
             </div>
           )}
         </div>
