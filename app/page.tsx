@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Skull, Crown, Users, LogIn, ScrollText } from "lucide-react";
 import { getScriptList } from "@/data/scripts";
 import { networkErrorMessage, readJsonResponse } from "@/lib/fetch-json";
+import { describeServerFailure } from "@/lib/diagnostic";
 
 export default function HomePage() {
   const router = useRouter();
@@ -14,10 +15,12 @@ export default function HomePage() {
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Cause précise obtenue auprès de /api/health après un échec.
+  const [diagnostic, setDiagnostic] = useState<string | null>(null);
   const scripts = getScriptList();
 
   async function handleCreate() {
-    setLoading(true); setError(null);
+    setLoading(true); setError(null); setDiagnostic(null);
     try {
       const res = await fetch("/api/game/create", {
         method: "POST",
@@ -27,12 +30,14 @@ export default function HomePage() {
       const { ok, data, error: apiError } = await readJsonResponse<{ code?: string }>(res);
       if (!ok || !data?.code) {
         setError(apiError ?? "Réponse inattendue du serveur");
+        setDiagnostic(await describeServerFailure());
         return;
       }
       // Le créateur sera le 1er à rejoindre, et deviendra Conteur
       router.push(`/game/${data.code}`);
     } catch (e: unknown) {
       setError(networkErrorMessage(e));
+      setDiagnostic(await describeServerFailure());
     } finally {
       setLoading(false);
     }
@@ -110,7 +115,19 @@ export default function HomePage() {
           <button onClick={handleCreate} disabled={loading} className="w-full p-4 bg-red-900 hover:bg-red-800 disabled:bg-stone-800 text-stone-100 ring-1 ring-red-700/50 tracking-[0.2em] uppercase text-sm">
             {loading ? "Création..." : "Créer la partie"}
           </button>
-          {error && <p className="text-red-400 text-sm mt-3">{error}</p>}
+          {error && (
+            <div className="mt-3 space-y-2">
+              <p className="text-red-400 text-sm">{error}</p>
+              {diagnostic && (
+                <p className="text-amber-300/80 text-xs leading-relaxed ring-1 ring-amber-900/50 bg-amber-950/20 p-3">
+                  {diagnostic}
+                </p>
+              )}
+              <p className="text-stone-500 text-xs">
+                Le <Link href="/simulator" className="underline hover:text-stone-300">mode simulation</Link> fonctionne sans serveur.
+              </p>
+            </div>
+          )}
         </div>
       )}
 
