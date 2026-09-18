@@ -14,7 +14,12 @@ export function getPusherServer(): Pusher | null {
   if (cached) return cached;
   if (cachedFailed) return null;
 
-  const { PUSHER_APP_ID, NEXT_PUBLIC_PUSHER_KEY, PUSHER_SECRET, NEXT_PUBLIC_PUSHER_CLUSTER } = process.env;
+  // Voir pusher-client : les valeurs collées dans Vercel traînent souvent une
+  // espace ou un retour à la ligne, qui rend l'URL de l'API invalide.
+  const PUSHER_APP_ID = process.env.PUSHER_APP_ID?.trim();
+  const NEXT_PUBLIC_PUSHER_KEY = process.env.NEXT_PUBLIC_PUSHER_KEY?.trim();
+  const PUSHER_SECRET = process.env.PUSHER_SECRET?.trim();
+  const NEXT_PUBLIC_PUSHER_CLUSTER = process.env.NEXT_PUBLIC_PUSHER_CLUSTER?.trim();
   if (!PUSHER_APP_ID || !NEXT_PUBLIC_PUSHER_KEY || !PUSHER_SECRET || !NEXT_PUBLIC_PUSHER_CLUSTER) {
     cachedFailed = true;
     console.warn("[pusher] variables d'environnement manquantes — temps réel désactivé");

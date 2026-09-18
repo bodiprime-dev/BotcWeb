@@ -6,6 +6,7 @@ import { SCRIPTS } from "@/data/scripts";
 import { getPusherClient, channelName } from "@/lib/pusher-client";
 import type { GameState, GameAction } from "@/lib/types";
 import { networkErrorMessage, readJsonResponse } from "@/lib/fetch-json";
+import { describeServerFailure } from "@/lib/diagnostic";
 import { StorytellerView } from "@/components/StorytellerView";
 import { PlayerView } from "@/components/PlayerView";
 import { LobbyRoleSteps, type LobbyStep } from "@/components/LobbyRoleSteps";
@@ -111,7 +112,10 @@ export default function GamePage() {
       });
       const { ok, data, error } = await readJsonResponse<{ playerId?: string; secret?: string }>(res);
       if (!ok || !data?.playerId) {
-        setNotice(error ?? "Impossible de rejoindre la partie");
+        // Le diagnostic serveur, quand il existe, est plus parlant que le motif
+        // générique renvoyé par la route.
+        const cause = await describeServerFailure();
+        setNotice(cause ?? error ?? "Impossible de rejoindre la partie");
         return;
       }
       localStorage.setItem(`bot:${code}`, data.playerId);

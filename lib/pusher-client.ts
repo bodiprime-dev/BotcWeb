@@ -17,11 +17,16 @@ export function getPusherClient(): PusherClient | null {
   if (client) return client;
   if (unavailable) return null;
 
-  const key = process.env.NEXT_PUBLIC_PUSHER_KEY;
-  const cluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER;
-  if (!key || !cluster) {
+  // `.trim()` : une valeur collée dans l'interface Vercel embarque souvent une
+  // espace ou un retour à la ligne. pusher-js la concatène telle quelle dans
+  // l'URL du WebSocket, et `new WebSocket("wss://ws-eu .pusher.com/…")` lève
+  // sur WebKit un « The string did not match the expected pattern. » très loin
+  // de sa cause. On refuse la valeur au lieu de tenter la connexion.
+  const key = process.env.NEXT_PUBLIC_PUSHER_KEY?.trim();
+  const cluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER?.trim();
+  if (!key || !cluster || !/^[a-z0-9-]+$/i.test(cluster)) {
     unavailable = true;
-    console.warn("[pusher] clés absentes — synchronisation par sondage");
+    console.warn("[pusher] clés absentes ou invalides — synchronisation par sondage");
     return null;
   }
 

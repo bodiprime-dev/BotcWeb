@@ -1,5 +1,14 @@
 import { NextResponse } from "next/server";
-import { configuredCredentialNames, isStoreConfigured, pingStore, relatedEnvNames } from "@/lib/store";
+import {
+  configuredCredentialNames,
+  isStoreConfigured,
+  pingStore,
+  inspectCredentials,
+  relatedEnvNames,
+  resolveStoreHost,
+  storeConfigIssue,
+  storeTargetLabel,
+} from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +21,12 @@ export const dynamic = "force-dynamic";
 // *noms* de variables — jamais une valeur, jamais un secret.
 export async function GET() {
   const store = isStoreConfigured();
-  const ping = store ? await pingStore() : { ok: false, error: "non configuré" };
+  const issue = storeConfigIssue();
+  const ping = store ? await pingStore() : { ok: false, error: "non configuré", hint: issue ?? undefined };
+  // Résolution DNS séparée : elle distingue « le nom d'hôte n'existe plus »
+  // (base supprimée) de « l'hôte existe mais l'appel échoue » (token, TLS,
+  // quota) — deux pannes que `fetch failed` confond.
+  const dns = store && !ping.ok ? await resolveStoreHost() : null;
 
   const realtimeServer = Boolean(
     process.env.PUSHER_APP_ID &&
@@ -26,12 +40,20 @@ export async function GET() {
       ok: ping.ok,
       store: {
         configured: store,
+        // Ce qui bloque, formulé en clair (URL TCP au lieu de REST, token
+        // orphelin, variable absente…). `null` quand la config est exploitable.
+        issue,
+        target: storeTargetLabel(),
         variables: configuredCredentialNames(),
         // Ce qui est présent dans l'environnement, valeurs exclues : la panne
         // est presque toujours « une URL TCP au lieu de la paire REST ».
         relatedVariables: relatedEnvNames(),
         reachable: ping.ok,
         error: ping.ok ? null : ping.error ?? null,
+        hint: ping.ok ? null : ping.hint ?? null,
+        dns: dns ? { resolved: dns.resolved, detail: dns.detail } : null,
+        // Anomalies des valeurs elles-mêmes, décrites sans les divulguer.
+        anomalies: inspectCredentials(),
       },
       realtime: {
         // Les NEXT_PUBLIC_* sont figées au build : ajoutées après coup, elles

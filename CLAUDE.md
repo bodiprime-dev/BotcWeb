@@ -55,7 +55,7 @@ data/
 
 | Variable | Rôle | Sans elle |
 |---|---|---|
-| `KV_REST_API_URL` + `KV_REST_API_TOKEN` **ou** `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` | Stockage des parties | Toutes les routes `/api/game/*` répondent **503 JSON** ; seul `/simulator` fonctionne |
+| `BOTC_KV_REST_API_URL` + `BOTC_KV_REST_API_TOKEN` (prioritaires), sinon `KV_REST_API_URL` + `KV_REST_API_TOKEN`, sinon `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` | Stockage des parties | Toutes les routes `/api/game/*` répondent **503 JSON** ; seul `/simulator` fonctionne |
 | `PUSHER_APP_ID`, `PUSHER_SECRET`, `NEXT_PUBLIC_PUSHER_KEY`, `NEXT_PUBLIC_PUSHER_CLUSTER` | Temps réel | Dégradation propre : synchronisation par sondage (4 s) |
 
 - `lib/store.ts` accepte les **deux** conventions de nommage : Vercel KV est maintenant servi
@@ -69,6 +69,28 @@ data/
 - **Diagnostic : `GET /api/health`** — répond toujours en JSON, teste un aller-retour réel avec
   le stockage et liste les *noms* de variables présentes (jamais les valeurs). `200` = sain,
   `503` = stockage injoignable.
+- **Cron anti-inactivité** (`vercel.json`) : `/api/health` est appelé une fois par jour. La
+  route écrit une clé (`health:ping`, TTL 60 s), ce qui suffit à garder la base active —
+  Upstash supprime les bases gratuites restées inactives, et c'est ce qui a coûté la base
+  précédente. Ne pas ajouter de clé non prévue par le schéma dans `vercel.json` : Vercel le
+  valide strictement et rejette le déploiement.
+
+### Remplacer une base supprimée
+
+**Échappatoire `BOTC_KV_*`** — `readCredentials()` essaie les paires dans l'ordre et retient la
+première complète. `BOTC_KV_REST_API_URL` + `BOTC_KV_REST_API_TOKEN` passent donc **avant** les
+variables posées par l'intégration Marketplace. C'est la seule issue quand celles-ci sont
+verrouillées (ni modifiables ni supprimables depuis l'interface Vercel) tout en pointant vers
+une base détruite : on ajoute la paire `BOTC_*` avec les identifiants de la nouvelle base, on
+redéploie, et les anciennes variables peuvent rester en place indéfiniment.
+
+L'assistant « Connect Project » **refuse d'écraser une variable existante** (`This project
+already has an existing environment variable with name KV_REST_API_TOKEN…`). Les variables de
+la base morte doivent donc être supprimées d'abord, dans Settings → Environment Variables et
+pour tous les environnements : `KV_REST_API_URL`, `KV_REST_API_TOKEN`,
+`KV_REST_API_READ_ONLY_TOKEN`, `KV_URL`, plus les `UPSTASH_*` / `REDIS_URL` résiduelles.
+Ensuite seulement : Storage → connecter la nouvelle base → **redéployer** (les variables ne
+sont injectées qu'au build suivant).
 
 ---
 
