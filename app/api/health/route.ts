@@ -3,7 +3,9 @@ import {
   configuredCredentialNames,
   isStoreConfigured,
   pingStore,
+  inspectCredentials,
   relatedEnvNames,
+  resolveStoreHost,
   storeConfigIssue,
   storeTargetLabel,
 } from "@/lib/store";
@@ -21,6 +23,10 @@ export async function GET() {
   const store = isStoreConfigured();
   const issue = storeConfigIssue();
   const ping = store ? await pingStore() : { ok: false, error: "non configuré", hint: issue ?? undefined };
+  // Résolution DNS séparée : elle distingue « le nom d'hôte n'existe plus »
+  // (base supprimée) de « l'hôte existe mais l'appel échoue » (token, TLS,
+  // quota) — deux pannes que `fetch failed` confond.
+  const dns = store && !ping.ok ? await resolveStoreHost() : null;
 
   const realtimeServer = Boolean(
     process.env.PUSHER_APP_ID &&
@@ -45,6 +51,9 @@ export async function GET() {
         reachable: ping.ok,
         error: ping.ok ? null : ping.error ?? null,
         hint: ping.ok ? null : ping.hint ?? null,
+        dns: dns ? { resolved: dns.resolved, detail: dns.detail } : null,
+        // Anomalies des valeurs elles-mêmes, décrites sans les divulguer.
+        anomalies: inspectCredentials(),
       },
       realtime: {
         // Les NEXT_PUBLIC_* sont figées au build : ajoutées après coup, elles

@@ -1,4 +1,5 @@
 import { createClient, type VercelKV } from "@vercel/kv";
+import { lookup } from "node:dns/promises";
 import type { GameState } from "./types";
 
 const TTL_SECONDS = 60 * 60 * 24; // une partie expire après 24h
@@ -112,6 +113,30 @@ export function storeTargetLabel(): string | null {
   }
 }
 
+// Anomalies détectables dans les *valeurs* sans jamais les divulguer. Un
+// caractère invisible (espace insécable, U+200B) survit au copier-coller et à
+// `trim()` : il rend l'URL invalide sans rien changer à son apparence.
+export function inspectCredentials(): string[] {
+  const found = readCredentials();
+  if (!found) return [];
+  const anomalies: string[] = [];
+
+  if (/[^\x20-\x7E]/.test(found.url)) anomalies.push("l'URL contient un caractère non-ASCII (invisible ?)");
+  if (/[^\x20-\x7E]/.test(found.token)) anomalies.push("le token contient un caractère non-ASCII (invisible ?)");
+  if (/["'`]/.test(found.url)) anomalies.push("l'URL contient un guillemet — la valeur a été collée avec ses délimiteurs");
+  if (/["'`]/.test(found.token)) anomalies.push("le token contient un guillemet");
+
+  try {
+    const parsed = new URL(found.url);
+    if (parsed.pathname !== "/" && parsed.pathname !== "") anomalies.push(`l'URL comporte un chemin (« ${parsed.pathname} ») — l'URL REST s'arrête au nom d'hôte`);
+    if (parsed.search) anomalies.push("l'URL comporte une chaîne de requête");
+    if (parsed.username || parsed.password) anomalies.push("l'URL embarque des identifiants — c'est la forme TCP, pas la forme REST");
+  } catch {
+    anomalies.push("l'URL n'est pas analysable");
+  }
+  return anomalies;
+}
+
 export function isStoreConfigured(): boolean {
   return readCredentials() !== null;
 }
@@ -155,12 +180,26 @@ export async function deleteGame(code: string): Promise<void> {
 
 // Le message d'erreur brut peut contenir l'URL de la base, voire le token en
 // cas de `fetch` trop bavard. On ne renvoie donc jamais la chaîne telle quelle.
-export function sanitizeStoreError(e: unknown): string {
-  const raw = e instanceof Error ? e.message : String(e);
-  return raw
+function redact(text: string): string {
+  return text
     .replace(/https?:\/\/\S+/gi, "<url>")
-    .replace(/\b[A-Za-z0-9_-]{24,}\b/g, "<secret>")
-    .slice(0, 200);
+    .replace(/\b[A-Za-z0-9_-]{24,}\b/g, "<secret>");
+}
+
+// `fetch` d'undici lève invariablement « TypeError: fetch failed » et range le
+// motif réel dans `cause` : getaddrinfo ENOTFOUND, ECONNREFUSED, un code TLS…
+// Ne lire que `message` revenait à jeter la seule information utile. On
+// parcourt donc la chaîne des causes en collectant `code` et `message`.
+export function sanitizeStoreError(e: unknown): string {
+  const parts: string[] = [];
+  let current: unknown = e;
+  for (let depth = 0; current instanceof Error && depth < 4; depth++) {
+    const code = (current as NodeJS.ErrnoException).code;
+    parts.push(code ? `${current.message} (${code})` : current.message);
+    current = (current as { cause?: unknown }).cause;
+  }
+  if (!parts.length) parts.push(String(e));
+  return redact(parts.join(" ← ")).slice(0, 300);
 }
 
 // Traduit l'échec en cause probable. Les messages viennent d'@upstash/redis
@@ -172,7 +211,19 @@ export function explainStoreError(message: string): string {
   if (/404|not found/i.test(message)) {
     return "La base répond « introuvable » : elle a probablement été supprimée ou renommée. Recrée-la et relie-la au projet.";
   }
-  if (/fetch failed|enotfound|econnrefused|getaddrinfo|network|invalid url|failed to parse/i.test(message)) {
+  if (/enotfound|eai_again|getaddrinfo/i.test(message)) {
+    return "Le nom d'hôte de la base n'existe plus dans le DNS : la base a été supprimée, ou l'URL contient une faute de frappe. Les bases Vercel KV héritées ont été retirées lors du passage à l'intégration Upstash du Marketplace — dans ce cas il faut en créer une nouvelle, la relier au projet, puis redéployer.";
+  }
+  if (/econnrefused|econnreset|ehostunreach|enetunreach/i.test(message)) {
+    return "L'hôte répond mais refuse la connexion : la base est suspendue (quota dépassé, paiement en attente) ou le port de l'URL a été modifié.";
+  }
+  if (/etimedout|timeout|und_err_connect_timeout|abort/i.test(message)) {
+    return "Délai dépassé en joignant la base : incident côté Upstash, ou base hébergée dans une région très éloignée de la fonction Vercel.";
+  }
+  if (/cert|tls|ssl|self.signed|unable to verify/i.test(message)) {
+    return "Échec de la négociation TLS avec la base : certificat expiré côté fournisseur, ou URL pointant vers un hôte qui n'est pas celui attendu.";
+  }
+  if (/fetch failed|network|invalid url|failed to parse/i.test(message)) {
     return "L'URL REST est injoignable : vérifie qu'elle est complète, en https://, sans espace ni retour à la ligne parasite (un copier-coller en ajoute souvent un).";
   }
   if (/429|quota|limit|exceeded/i.test(message)) {
@@ -183,6 +234,18 @@ export function explainStoreError(message: string): string {
 
 // Aller-retour réel avec le stockage : `isStoreConfigured()` ne dit que si les
 // variables existent, pas si elles sont valides (token révoqué, base supprimée).
+export async function resolveStoreHost(): Promise<{ resolved: boolean; detail: string }> {
+  const found = readCredentials();
+  if (!found) return { resolved: false, detail: "aucune URL" };
+  try {
+    const { hostname } = new URL(found.url);
+    await lookup(hostname);
+    return { resolved: true, detail: "le nom d'hôte est résolu" };
+  } catch (e) {
+    return { resolved: false, detail: sanitizeStoreError(e) };
+  }
+}
+
 export async function pingStore(): Promise<{ ok: boolean; error?: string; hint?: string }> {
   try {
     await client().set("health:ping", Date.now(), { ex: 60 });

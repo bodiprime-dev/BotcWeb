@@ -10,6 +10,8 @@ type Health = {
     error?: string | null;
     hint?: string | null;
     target?: string | null;
+    dns?: { resolved?: boolean; detail?: string } | null;
+    anomalies?: string[];
     variables?: string[];
   };
   commit?: string | null;
@@ -44,7 +46,9 @@ export async function describeServerFailure(): Promise<string | null> {
   }
   if (store.reachable === false) {
     const target = store.target ? ` Cible : ${store.target}.` : "";
-    return `${store.hint ?? "Base reliée mais injoignable."}${target} Détail serveur : ${store.error ?? "inconnu"}.`;
+    const anomalies = store.anomalies?.length ? ` Anomalies détectées : ${store.anomalies.join(" ; ")}.` : "";
+    const dns = store.dns && store.dns.resolved === false ? ` DNS : ${store.dns.detail}.` : "";
+    return `${store.hint ?? "Base reliée mais injoignable."}${target}${dns}${anomalies} Détail serveur : ${store.error ?? "inconnu"}.`;
   }
   return null;
 }
