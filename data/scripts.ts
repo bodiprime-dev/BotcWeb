@@ -174,6 +174,16 @@ const TROUBLE_BREWING: Script = {
       team: "traveler",
       ability: "Si un joueur de ton alignement est exécuté, tu peux choisir de mourir à sa place. Sinon, tu n'as aucun autre pouvoir.",
     },
+    gunslinger: {
+      name: "Gunslinger",
+      team: "traveler",
+      ability: "Chaque jour, après le dépouillement du 1er vote, tu peux désigner un joueur ayant voté : il meurt.",
+    },
+    beggar: {
+      name: "Beggar",
+      team: "traveler",
+      ability: "Tu dois recevoir un jeton de vote d'un joueur mort pour pouvoir voter. Quand un joueur mort te donne son jeton, tu apprends son alignement. Tu es toujours sobre et en bonne santé.",
+    },
   },
 };
 
@@ -349,6 +359,16 @@ const BAD_MOON_RISING: Script = {
       team: "traveler",
       ability: "Si un joueur de ton alignement est exécuté, tu peux choisir de mourir à sa place. Sinon, tu n'as aucun autre pouvoir.",
     },
+    gunslinger: {
+      name: "Gunslinger",
+      team: "traveler",
+      ability: "Chaque jour, après le dépouillement du 1er vote, tu peux désigner un joueur ayant voté : il meurt.",
+    },
+    beggar: {
+      name: "Beggar",
+      team: "traveler",
+      ability: "Tu dois recevoir un jeton de vote d'un joueur mort pour pouvoir voter. Quand un joueur mort te donne son jeton, tu apprends son alignement. Tu es toujours sobre et en bonne santé.",
+    },
   },
 };
 
@@ -500,6 +520,16 @@ const TROUBLE_BREWING_PLUS: Script = {
       name: "Scapegoat",
       team: "traveler",
       ability: "Si un joueur de ton alignement est exécuté, tu peux choisir de mourir à sa place. Sinon, tu n'as aucun autre pouvoir.",
+    },
+    gunslinger: {
+      name: "Gunslinger",
+      team: "traveler",
+      ability: "Chaque jour, après le dépouillement du 1er vote, tu peux désigner un joueur ayant voté : il meurt.",
+    },
+    beggar: {
+      name: "Beggar",
+      team: "traveler",
+      ability: "Tu dois recevoir un jeton de vote d'un joueur mort pour pouvoir voter. Quand un joueur mort te donne son jeton, tu apprends son alignement. Tu es toujours sobre et en bonne santé.",
     },
   },
 };

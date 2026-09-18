@@ -85,6 +85,31 @@ players → roles → drunk? → lunatic? → lunatic-bluffs? → bluffs? → ST
 
 ---
 
+## Parties de plus de 15 joueurs — Voyageurs
+
+BotC plafonne à 15 joueurs assis : au-delà, les surnuméraires jouent en **Voyageur**
+(`team: "traveler"`). Une soirée à 20 joueurs = 15 rôles standards (9/2/3/1) + 5 Voyageurs.
+
+- `getRoleQuotas(playerCount, selectedRoleIds)` (`lib/game.ts`) renvoie `travelers = max(0, playerCount - 15)`
+  et garde la distribution officielle sur les 15 premiers.
+- Chaque script définit 5 Voyageurs : Bureaucrat, Thief, Scapegoat, Gunslinger, Beggar.
+- Au `START_GAME`, le tirage se fait **sans remise** (aucun rôle distribué deux fois).
+  La remise n'intervient que si le script compte moins de Voyageurs distincts que de places.
+- Le démarrage est refusé si `travelerCount > 0` et que le script ne définit aucun Voyageur.
+- Les Voyageurs sont exclus du décompte `playable` de `checkWinCondition()` : ni le seuil
+  « ≤ 2 vivants », ni la victoire des Bons ne les comptent.
+- `EXILE_TRAVELER` tue un Voyageur sans passer par une nomination ni déclencher de fin de partie.
+- L'alignement d'un Voyageur (public, décidé par le Conteur) n'est **pas** modélisé dans `Player` :
+  le Conteur le note via `RoleInfoEditor` (entrée `text`).
+
+**Sélection manuelle partielle** : si `selectedRoleIds.length < playerCount`, les rôles choisis par
+le GM sont conservés et seules les places manquantes sont tirées, équipe par équipe (Démon → Sbires →
+Voyageurs → Outsiders → Townsfolk), avec l'ajustement Baron appliqué après le tirage des Sbires.
+La sélection du GM fait foi : s'il choisit lui-même 9 Townsfolk et 2 Outsiders avec un Baron,
+elle n'est pas réécrite par les quotas.
+
+---
+
 ## Rôles spéciaux — comportements à connaître
 
 ### Drunk
