@@ -19,6 +19,13 @@ export default function HomePage() {
   const [diagnostic, setDiagnostic] = useState<string | null>(null);
   const scripts = getScriptList();
 
+  // Marqueur de build : Vercel expose NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA au
+  // moment du build (variables système exposées automatiquement). Il répond en
+  // un coup d'œil à « la version déployée contient-elle bien mon correctif ? » —
+  // question impossible à trancher depuis un iPad sans outils de développement,
+  // alors que Safari sert volontiers un ancien bundle depuis son cache.
+  const commit = process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "dev";
+
   async function handleCreate() {
     setLoading(true); setError(null); setDiagnostic(null);
     try {
@@ -147,6 +154,11 @@ export default function HomePage() {
           </button>
         </div>
       )}
+
+      <footer className="mt-12 text-center text-[10px] text-stone-700 tracking-wider">
+        build {commit} ·{" "}
+        <a href="/api/health" className="underline hover:text-stone-500">diagnostic serveur</a>
+      </footer>
     </div>
   );
 }
