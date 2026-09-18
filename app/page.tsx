@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Skull, Crown, Users, LogIn, ScrollText } from "lucide-react";
 import { getScriptList } from "@/data/scripts";
+import { networkErrorMessage, readJsonResponse } from "@/lib/fetch-json";
 
 export default function HomePage() {
   const router = useRouter();
@@ -23,12 +24,15 @@ export default function HomePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ scriptId }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erreur");
+      const { ok, data, error: apiError } = await readJsonResponse<{ code?: string }>(res);
+      if (!ok || !data?.code) {
+        setError(apiError ?? "Réponse inattendue du serveur");
+        return;
+      }
       // Le créateur sera le 1er à rejoindre, et deviendra Conteur
       router.push(`/game/${data.code}`);
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(networkErrorMessage(e));
     } finally {
       setLoading(false);
     }

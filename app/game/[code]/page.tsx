@@ -1,10 +1,11 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, BookOpen, ChevronDown, ChevronUp, Crown, MessageCircle, Users, UserPlus } from "lucide-react";
 import { SCRIPTS } from "@/data/scripts";
 import { getPusherClient, channelName } from "@/lib/pusher-client";
 import type { GameState, GameAction } from "@/lib/types";
+import { networkErrorMessage, readJsonResponse } from "@/lib/fetch-json";
 import { StorytellerView } from "@/components/StorytellerView";
 import { PlayerView } from "@/components/PlayerView";
 import { LobbyRoleSteps, type LobbyStep } from "@/components/LobbyRoleSteps";
@@ -19,7 +20,12 @@ export default function GamePage() {
   const [secret, setSecret] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [joining, setJoining] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // `fatalError` bloque la page (partie inexistante) ; `notice` est un message
+  // transitoire (action refusée, perte de réseau) qui n'empêche pas de jouer.
+  const [fatalError, setFatalError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  // Permet à dispatch() de resynchroniser sans attendre Pusher.
+  const refetchRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -31,36 +37,64 @@ export default function GamePage() {
 
   useEffect(() => {
     let mounted = true;
+    // `null` quand les clés Pusher manquent : la page reste pleinement
+    // fonctionnelle et se synchronise par sondage.
     const pusher = getPusherClient();
-    const channel = pusher.subscribe(channelName(code));
+    const channel = pusher ? pusher.subscribe(channelName(code)) : null;
     const refetch = () => {
       const url = playerId
         ? `/api/game/${code}?playerId=${encodeURIComponent(playerId)}`
         : `/api/game/${code}`;
       fetch(url, { cache: "no-store" })
-        .then(res => {
-          if (res.status === 404) throw new Error("Partie introuvable");
-          return res.json();
+        .then(async res => {
+          const { ok, data, error } = await readJsonResponse<{ state?: GameState }>(res);
+          if (!mounted) return;
+          if (res.status === 404) {
+            // Seul cas réellement fatal : la partie n'existe pas / a expiré.
+            setFatalError("Partie introuvable — elle a peut-être expiré (24 h).");
+            return;
+          }
+          if (!ok || !data?.state) {
+            // Erreur serveur transitoire : on garde l'état déjà affiché et on
+            // se contente d'un bandeau. Auparavant la page se figeait sur un
+            // écran d'erreur définitif, sans aucune reprise possible.
+            setNotice(error ?? "Synchronisation impossible");
+            return;
+          }
+          setGame(data.state);
+          setNotice(null);
         })
-        .then(data => { if (mounted && data.state) setGame(data.state); })
-        .catch(e => { if (mounted) setError(e.message); });
+        .catch(e => {
+          // Coupure réseau, onglet réveillé hors ligne… non fatal : la prochaine
+          // reprise de focus relancera la synchronisation.
+          if (mounted) setNotice(networkErrorMessage(e));
+        });
     };
+    refetchRef.current = refetch;
     // Si Pusher manque un événement (déconnexion, mise en veille de l'onglet,
     // suspension mobile…), on resynchronise dès que l'onglet redevient actif
     // ou prend le focus. Évite d'avoir à faire F5 manuellement.
     const onVisible = () => { if (document.visibilityState === "visible") refetch(); };
     const onFocus = () => refetch();
     const onConnected = () => refetch();
-    channel.bind("state-changed", refetch);
-    pusher.connection.bind("connected", onConnected);
+    channel?.bind("state-changed", refetch);
+    pusher?.connection.bind("connected", onConnected);
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", onFocus);
     refetch();
+    // Filet de sécurité : si le temps réel est indisponible (clés Pusher
+    // absentes, quota atteint, websocket bloqué par un réseau d'entreprise),
+    // un sondage garde la table synchronisée au lieu de la figer. On sonde
+    // plus souvent quand Pusher est totalement absent.
+    const poll = setInterval(() => {
+      if (document.visibilityState === "visible") refetch();
+    }, pusher ? 15000 : 4000);
     return () => {
       mounted = false;
-      channel.unbind_all();
-      pusher.unsubscribe(channelName(code));
-      pusher.connection.unbind("connected", onConnected);
+      clearInterval(poll);
+      channel?.unbind_all();
+      pusher?.unsubscribe(channelName(code));
+      pusher?.connection.unbind("connected", onConnected);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onFocus);
     };
@@ -68,48 +102,88 @@ export default function GamePage() {
 
   async function handleJoin() {
     if (!name.trim()) return;
-    setJoining(true); setError(null);
+    setJoining(true); setNotice(null);
     try {
       const res = await fetch("/api/game/join", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code, name: name.trim() }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erreur");
+      const { ok, data, error } = await readJsonResponse<{ playerId?: string; secret?: string }>(res);
+      if (!ok || !data?.playerId) {
+        setNotice(error ?? "Impossible de rejoindre la partie");
+        return;
+      }
       localStorage.setItem(`bot:${code}`, data.playerId);
       if (data.secret) localStorage.setItem(`bot:${code}:secret`, data.secret);
       setPlayerId(data.playerId);
       if (data.secret) setSecret(data.secret);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Erreur");
+      setNotice(networkErrorMessage(e));
     } finally {
       setJoining(false);
     }
   }
 
-  async function dispatch(action: GameAction) {
-    if (!playerId || !secret) return;
-    await fetch("/api/game/action", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code, playerId, secret, action }),
-    });
-  }
+  // Envoie une action au serveur.
+  //
+  // L'ancienne version ignorait totalement la réponse : une action refusée
+  // (session invalide, droits GM, partie expirée) ou une panne réseau ne
+  // produisait aucun retour — l'interface semblait simplement figée. On
+  // remonte désormais l'erreur, et on resynchronise systématiquement pour ne
+  // pas dépendre uniquement de l'événement Pusher.
+  const dispatch = useCallback(async (action: GameAction) => {
+    if (!playerId || !secret) {
+      setNotice("Session inconnue — rejoins à nouveau la partie.");
+      return;
+    }
+    try {
+      const res = await fetch("/api/game/action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, playerId, secret, action }),
+      });
+      const { ok, error } = await readJsonResponse<{ ok?: boolean }>(res);
+      if (!ok) {
+        setNotice(error ?? "Action refusée");
+        refetchRef.current();
+        return;
+      }
+      setNotice(null);
+      refetchRef.current();
+    } catch (e: unknown) {
+      setNotice(networkErrorMessage(e));
+    }
+  }, [code, playerId, secret]);
 
-  if (error) {
+  if (fatalError) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
         <div className="text-center">
-          <p className="text-red-400 mb-4">{error}</p>
+          <p className="text-red-400 mb-4">{fatalError}</p>
           <button onClick={() => router.push("/")} className="text-stone-300 underline">Retour</button>
         </div>
       </div>
     );
   }
 
+  // Bandeau non bloquant : l'utilisateur garde la main sur la partie.
+  const noticeBanner = notice ? (
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 max-w-[90vw] px-4 py-2 bg-red-950/90 ring-1 ring-red-800 text-red-200 text-xs backdrop-blur flex items-center gap-3">
+      <span>{notice}</span>
+      <button onClick={() => { setNotice(null); refetchRef.current(); }} className="underline uppercase tracking-wider">
+        Réessayer
+      </button>
+    </div>
+  ) : null;
+
   if (!game) {
-    return <div className="min-h-screen flex items-center justify-center text-stone-500">Chargement...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center text-stone-500">
+        Chargement...
+        {noticeBanner}
+      </div>
+    );
   }
 
   const me = playerId ? game.players.find(p => p.id === playerId) ?? null : null;
@@ -151,15 +225,23 @@ export default function GamePage() {
             </div>
           )}
         </div>
+        {noticeBanner}
       </div>
     );
   }
 
-  if (game.phase === "lobby")
-    return <Lobby game={game} me={me} dispatch={dispatch} onLeave={() => router.push("/")} />;
-  if (me.isStoryteller)
-    return <StorytellerView game={game} me={me} dispatch={dispatch} onLeave={() => router.push("/")} />;
-  return <PlayerView game={game} me={me} dispatch={dispatch} onLeave={() => router.push("/")} />;
+  return (
+    <>
+      {game.phase === "lobby" ? (
+        <Lobby game={game} me={me} dispatch={dispatch} onLeave={() => router.push("/")} />
+      ) : me.isStoryteller ? (
+        <StorytellerView game={game} me={me} dispatch={dispatch} onLeave={() => router.push("/")} />
+      ) : (
+        <PlayerView game={game} me={me} dispatch={dispatch} onLeave={() => router.push("/")} />
+      )}
+      {noticeBanner}
+    </>
+  );
 }
 
 function Lobby({ game, me, dispatch, onLeave }: {
