@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { applyAction } from "@/lib/game";
 import { getGame, saveGame } from "@/lib/store";
-import { pusherServer, channelName } from "@/lib/pusher-server";
+import { notifyGame } from "@/lib/pusher-server";
+import { normalizeCode, readJson, withApiErrors } from "@/lib/api";
 import type { GameAction, GameState } from "@/lib/types";
 
 // L'action est-elle légitime venant de `callerId` ?
@@ -50,31 +51,38 @@ function isAuthorized(state: GameState, action: GameAction, callerId: string): b
 }
 
 export async function POST(req: NextRequest) {
-  const { code, playerId, secret, action } = (await req.json()) as {
-    code: string;
-    playerId: string;
-    secret: string;
-    action: GameAction;
-  };
-  if (!code || !playerId || !secret || !action) {
-    return NextResponse.json({ error: "Missing fields" }, { status: 400 });
-  }
+  return withApiErrors(async () => {
+    const body = await readJson<{
+      code?: string;
+      playerId?: string;
+      secret?: string;
+      action?: GameAction;
+    }>(req);
 
-  const game = await getGame(code);
-  if (!game) return NextResponse.json({ error: "Game not found" }, { status: 404 });
+    const code = normalizeCode(body?.code);
+    const { playerId, secret, action } = body ?? {};
+    if (!code || !playerId || !secret || !action) {
+      return NextResponse.json({ error: "Requête incomplète" }, { status: 400 });
+    }
 
-  const expected = game.secrets[playerId];
-  if (!expected || expected !== secret) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+    const game = await getGame(code);
+    if (!game) return NextResponse.json({ error: "Partie introuvable" }, { status: 404 });
 
-  if (!isAuthorized(game, action, playerId)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+    const expected = game.secrets[playerId];
+    if (!expected || expected !== secret) {
+      return NextResponse.json({ error: "Session invalide — rejoins à nouveau la partie" }, { status: 401 });
+    }
 
-  const updated = applyAction(game, action);
-  await saveGame(updated);
-  await pusherServer.trigger(channelName(code), "state-changed", { at: Date.now() });
+    if (!isAuthorized(game, action, playerId)) {
+      return NextResponse.json({ error: "Action non autorisée" }, { status: 403 });
+    }
 
-  return NextResponse.json({ ok: true });
+    const updated = applyAction(game, action);
+    await saveGame(updated);
+    // Best-effort : l'état est déjà persisté, un échec Pusher ne doit pas
+    // faire croire au client que son action a été rejetée.
+    const realtime = await notifyGame(code);
+
+    return NextResponse.json({ ok: true, realtime });
+  });
 }
