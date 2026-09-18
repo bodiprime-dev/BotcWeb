@@ -24,7 +24,15 @@ export class StoreUnavailableError extends Error {
 // UPSTASH_REDIS_REST_TOKEN. Le singleton `kv` exporté par @vercel/kv ne lit
 // que la première paire : avec une base Upstash correctement reliée, toutes
 // les routes répondaient malgré tout « stockage indisponible ».
+//
+// L'ordre compte : la première paire complète gagne. BOTC_* est en tête parce
+// qu'elle sert d'échappatoire — les variables posées par une intégration
+// Marketplace peuvent être verrouillées (ni modifiables ni supprimables depuis
+// l'interface) alors même qu'elles pointent vers une base détruite. Dans ce
+// cas, aucune manipulation Vercel ne débloque la situation ; ajouter
+// BOTC_KV_REST_API_URL + BOTC_KV_REST_API_TOKEN, si.
 const CREDENTIAL_PAIRS = [
+  { url: "BOTC_KV_REST_API_URL", token: "BOTC_KV_REST_API_TOKEN" },
   { url: "KV_REST_API_URL", token: "KV_REST_API_TOKEN" },
   { url: "UPSTASH_REDIS_REST_URL", token: "UPSTASH_REDIS_REST_TOKEN" },
   { url: "REDIS_REST_API_URL", token: "REDIS_REST_API_TOKEN" },
@@ -93,7 +101,7 @@ export function configuredCredentialNames(): string[] {
 // URLs TCP inutilisables par le client REST.
 export function relatedEnvNames(): string[] {
   return Object.keys(process.env)
-    .filter((name) => /^(KV_|UPSTASH_|REDIS_)/.test(name))
+    .filter((name) => /^(BOTC_KV_|KV_|UPSTASH_|REDIS_)/.test(name))
     .sort();
 }
 
