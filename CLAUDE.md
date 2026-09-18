@@ -51,6 +51,38 @@ data/
 
 ---
 
+## Configuration & déploiement (Vercel)
+
+| Variable | Rôle | Sans elle |
+|---|---|---|
+| `KV_REST_API_URL` + `KV_REST_API_TOKEN` **ou** `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` | Stockage des parties | Toutes les routes `/api/game/*` répondent **503 JSON** ; seul `/simulator` fonctionne |
+| `PUSHER_APP_ID`, `PUSHER_SECRET`, `NEXT_PUBLIC_PUSHER_KEY`, `NEXT_PUBLIC_PUSHER_CLUSTER` | Temps réel | Dégradation propre : synchronisation par sondage (4 s) |
+
+- `lib/store.ts` accepte les **deux** conventions de nommage : Vercel KV est maintenant servi
+  par l'intégration Upstash du Marketplace, qui injecte `UPSTASH_REDIS_REST_*` selon la façon
+  dont la base a été reliée. Le singleton `kv` de `@vercel/kv` ne lit que `KV_REST_API_*` —
+  d'où un client instancié explicitement via `createClient()`.
+- `REDIS_URL` / `KV_URL` sont des URLs **TCP** : inutilisables par le client REST, elles ne
+  suffisent pas.
+- Les `NEXT_PUBLIC_*` sont inlinées **au build** : les ajouter après coup n'a d'effet qu'au
+  redéploiement suivant.
+- **Diagnostic : `GET /api/health`** — répond toujours en JSON, teste un aller-retour réel avec
+  le stockage et liste les *noms* de variables présentes (jamais les valeurs). `200` = sain,
+  `503` = stockage injoignable.
+
+---
+
+## Contrat d'erreur API
+
+Toute route `/api/*` répond en JSON, y compris en erreur (`{ error: string }`) — via
+`withApiErrors()` (`lib/api.ts`). Côté client, aucune page ne fait `res.json()` directement :
+elles passent par `readJsonResponse()` (`lib/fetch-json.ts`), qui lit le corps en texte avant
+de le parser. Une page d'erreur HTML ou un corps vide donnait sinon un message de parseur
+illisible (sur Safari : « The string did not match the expected pattern. ») à la place du
+vrai motif.
+
+---
+
 ## Règles fondamentales du reducer (`lib/game.ts`)
 
 - `applyAction(state, action)` est **pur** (sans effets de bord).

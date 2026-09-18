@@ -23,7 +23,10 @@ export function normalizeCode(code: unknown): string | null {
 
 export function storeNotConfigured() {
   return NextResponse.json(
-    { error: "Serveur mal configuré : stockage des parties indisponible (KV_REST_API_URL / KV_REST_API_TOKEN). Le mode simulation reste utilisable." },
+    {
+      error:
+        "Serveur mal configuré : stockage des parties indisponible. Relie une base KV/Upstash au projet (KV_REST_API_URL + KV_REST_API_TOKEN, ou UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN) puis redéploie. Diagnostic : /api/health. Le mode simulation reste utilisable.",
+    },
     { status: 503 },
   );
 }
