@@ -3,7 +3,15 @@ import { readJsonResponse } from "./fetch-json";
 
 type Health = {
   ok?: boolean;
-  store?: { configured?: boolean; reachable?: boolean; error?: string | null; variables?: string[] };
+  store?: {
+    configured?: boolean;
+    reachable?: boolean;
+    issue?: string | null;
+    error?: string | null;
+    hint?: string | null;
+    target?: string | null;
+    variables?: string[];
+  };
   commit?: string | null;
   env?: string | null;
 };
@@ -30,10 +38,13 @@ export async function describeServerFailure(): Promise<string | null> {
 
   const store = health.store ?? {};
   if (store.configured === false) {
-    return "Aucune base KV/Upstash n'est reliée à ce déploiement : relie-la au projet dans Vercel (onglet Storage), puis redéploie.";
+    return store.issue
+      ? `Stockage inutilisable : ${store.issue}`
+      : "Aucune base KV/Upstash n'est reliée à ce déploiement : relie-la au projet dans Vercel (onglet Storage), puis redéploie.";
   }
   if (store.reachable === false) {
-    return `Base reliée mais injoignable (${store.error ?? "raison inconnue"}) — vérifie que le token REST est toujours valide.`;
+    const target = store.target ? ` Cible : ${store.target}.` : "";
+    return `${store.hint ?? "Base reliée mais injoignable."}${target} Détail serveur : ${store.error ?? "inconnu"}.`;
   }
   return null;
 }
