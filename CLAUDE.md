@@ -69,6 +69,21 @@ data/
 - **Diagnostic : `GET /api/health`** — répond toujours en JSON, teste un aller-retour réel avec
   le stockage et liste les *noms* de variables présentes (jamais les valeurs). `200` = sain,
   `503` = stockage injoignable.
+- **Cron anti-inactivité** (`vercel.json`) : `/api/health` est appelé une fois par jour. La
+  route écrit une clé (`health:ping`, TTL 60 s), ce qui suffit à garder la base active —
+  Upstash supprime les bases gratuites restées inactives, et c'est ce qui a coûté la base
+  précédente. Ne pas ajouter de clé non prévue par le schéma dans `vercel.json` : Vercel le
+  valide strictement et rejette le déploiement.
+
+### Remplacer une base supprimée
+
+L'assistant « Connect Project » **refuse d'écraser une variable existante** (`This project
+already has an existing environment variable with name KV_REST_API_TOKEN…`). Les variables de
+la base morte doivent donc être supprimées d'abord, dans Settings → Environment Variables et
+pour tous les environnements : `KV_REST_API_URL`, `KV_REST_API_TOKEN`,
+`KV_REST_API_READ_ONLY_TOKEN`, `KV_URL`, plus les `UPSTASH_*` / `REDIS_URL` résiduelles.
+Ensuite seulement : Storage → connecter la nouvelle base → **redéployer** (les variables ne
+sont injectées qu'au build suivant).
 
 ---
 
